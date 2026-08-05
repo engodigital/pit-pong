@@ -112,19 +112,19 @@
  * desde cualquier móvil, tablet u ordenador.
  *
  * CÓMO SE USA (ya está hecho, esto es sólo referencia):
- *   1. Hoja de cálculo &quot;Pit Pong DB&quot; (ID abajo).
+ *   1. Hoja de cálculo "Pit Pong DB" (ID abajo).
  *   2. Implementar &gt; Nueva implementación &gt; Aplicación web
  *      - Ejecutar como: Yo
  *      - Quién tiene acceso: Cualquier usuario
  *   3. Pegar la URL /exec en PITPONG_API de index.html
  *
- * IMPORTANTE: la app envía Content-Type &quot;text/plain&quot; a propósito. Con
- * &quot;application/json&quot; el navegador haría una petición previa OPTIONS que
+ * IMPORTANTE: la app envía Content-Type "text/plain" a propósito. Con
+ * "application/json" el navegador haría una petición previa OPTIONS que
  * Apps Script no sabe responder, y todas las llamadas fallarían por CORS.
  */
 
-var SHEET_ID = &#x27;1jyQZHeDxSvT0xkJ5Rlcg86d3a7uW8QjQ08ym8h7NVGU&#x27;;
-var CARPETA_FOTOS = &#x27;Pit Pong - Fotos&#x27;;
+var SHEET_ID = '1jyQZHeDxSvT0xkJ5Rlcg86d3a7uW8QjQ08ym8h7NVGU';
+var CARPETA_FOTOS = 'Pit Pong - Fotos';
 
 /**
  * openById y getSheetByName son llamadas caras: sin caché, un guardado con
@@ -141,7 +141,7 @@ function ss_() {
 function hoja_(nombre) {
   if (_hojas[nombre]) return _hojas[nombre];
   var h = ss_().getSheetByName(nombre);
-  if (!h) throw new Error(&#x27;Falta la hoja &quot;&#x27; + nombre + &#x27;&quot; en Pit Pong DB&#x27;);
+  if (!h) throw new Error('Falta la hoja "' + nombre + '" en Pit Pong DB');
   _hojas[nombre] = h;
   return h;
 }
@@ -159,7 +159,7 @@ function leerTabla_(nombre) {
   var cab = datos[0];
   var filas = [];
   for (var i = 1; i &lt; datos.length; i++) {
-    if (String(datos[i][0]).trim() === &#x27;&#x27;) continue; // fila vacía
+    if (String(datos[i][0]).trim() === '') continue; // fila vacía
     var o = {};
     for (var c = 0; c &lt; cab.length; c++) o[cab[c]] = datos[i][c];
     filas.push(o);
@@ -184,14 +184,14 @@ function escribirTabla_(nombre, filas) {
   var matriz = (filas || []).map(function (f) {
     return cab.map(function (col) {
       var v = f[col];
-      return (v === undefined || v === null) ? &#x27;&#x27; : v;
+      return (v === undefined || v === null) ? '' : v;
     });
   });
 
   // ¿Idéntico a lo que ya está escrito? Entonces no hacemos nada.
   var actual = (ultimaFila &gt; 1)
     ? h.getRange(2, 1, ultimaFila - 1, ultimaCol).getValues()
-        .filter(function (r) { return String(r[0]).trim() !== &#x27;&#x27;; })
+        .filter(function (r) { return String(r[0]).trim() !== ''; })
     : [];
   if (JSON.stringify(actual) === JSON.stringify(matriz)) return false;
 
@@ -220,12 +220,13 @@ function partidosDe_(t) {
     ronda.forEach(function (m, iPartido) {
       if (!m.a &amp;&amp; !m.b) return;                 // hueco del cuadro, no es un partido
       salida.push({
-        id: m.id || (t.id + &#x27;_r&#x27; + iRonda + &#x27;p&#x27; + iPartido),
+        id: m.id || (t.id + '_r' + iRonda + 'p' + iPartido),
         jornada: iRonda + 1,                    // ronda 1 = primera eliminatoria
         a: m.a, b: m.b,
         winner: m.winner || null,
         sets: m.sets || [],
-        scoreLabel: m.scoreLabel || &#x27;&#x27;
+        scoreLabel: m.scoreLabel || '',
+        playedAt: m.playedAt || null
       });
     });
   });
@@ -235,24 +236,24 @@ function partidosDe_(t) {
 function nombresDe_(ids, mapaJugadores) {
   return (ids || []).map(function (id) {
     return mapaJugadores[id] || id;
-  }).join(&#x27; + &#x27;);
+  }).join(' + ');
 }
 
 function parcialesTexto_(games) {
-  return (games || []).map(function (g) { return g.a + &#x27;-&#x27; + g.b; }).join(&#x27; | &#x27;);
+  return (games || []).map(function (g) { return g.a + '-' + g.b; }).join(' | ');
 }
 
 function parcialesParse_(texto) {
   if (!texto) return [];
-  return String(texto).split(&#x27;|&#x27;).map(function (p) {
+  return String(texto).split('|').map(function (p) {
     var m = p.trim().match(/^(\d+)\s*-\s*(\d+)$/);
     return m ? { a: Number(m[1]), b: Number(m[2]) } : null;
   }).filter(function (x) { return x; });
 }
 
 function fecha_(ms) {
-  if (!ms) return &#x27;&#x27;;
-  return Utilities.formatDate(new Date(Number(ms)), Session.getScriptTimeZone(), &#x27;yyyy-MM-dd HH:mm:ss&#x27;);
+  if (!ms) return '';
+  return Utilities.formatDate(new Date(Number(ms)), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
 }
 
 /* ============================ API ============================ */
@@ -270,18 +271,18 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents);
     var accion = body.accion;
 
-    if (accion === &#x27;guardar&#x27;) {
+    if (accion === 'guardar') {
       // guardarTodo_ ya devuelve el estado fusionado: releer la hoja otra vez
       // sólo para responder duplicaba el tiempo de guardado.
       return json_({ ok: true, datos: guardarTodo_(body.datos) });
     }
-    if (accion === &#x27;cargar&#x27;) {
+    if (accion === 'cargar') {
       return json_({ ok: true, datos: cargarTodo_() });
     }
-    if (accion === &#x27;subirFoto&#x27;) {
+    if (accion === 'subirFoto') {
       return json_({ ok: true, foto: subirFoto_(body) });
     }
-    return json_({ ok: false, error: &#x27;Acción desconocida: &#x27; + accion });
+    return json_({ ok: false, error: 'Acción desconocida: ' + accion });
   } catch (err) {
     return json_({ ok: false, error: String(err) });
   }
@@ -290,17 +291,17 @@ function doPost(e) {
 /* ------------------------------ CARGAR ------------------------------ */
 
 function cargarTodo_() {
-  var jugadores = leerTabla_(&#x27;Jugadores&#x27;).map(function (f) {
+  var jugadores = leerTabla_('Jugadores').map(function (f) {
     return {
       id: String(f.id),
       name: String(f.nombre),
-      creadoEn: f.creadoEn || &#x27;&#x27;,
-      photo: f.foto ? String(f.foto) : &#x27;&#x27;
+      creadoEn: f.creadoEn || '',
+      photo: f.foto ? String(f.foto) : ''
     };
   });
 
   var partidosPorTorneo = {};
-  leerTabla_(&#x27;Partidos&#x27;).forEach(function (f) {
+  leerTabla_('Partidos').forEach(function (f) {
     var tid = String(f.torneoId);
     if (!partidosPorTorneo[tid]) partidosPorTorneo[tid] = [];
     // Las columnas con nombre son para leerlas nosotros; la app trabaja
@@ -313,12 +314,15 @@ function cargarTodo_() {
       b: String(f.jugadorBId),
       winner: f.ganadorId ? String(f.ganadorId) : null,
       sets: parcialesParse_(f.parciales),
-      scoreLabel: f.resultado ? String(f.resultado) : &#x27;&#x27;
+      scoreLabel: f.resultado ? String(f.resultado) : '',
+      // Fecha propia de cada partido (histórico). Los antiguos comparten la
+      // fecha de cierre del torneo porque no se guardaba nada más fino.
+      playedAt: f.jugadoEn ? new Date(f.jugadoEn).getTime() : null
     });
   });
 
   var fotosPorRegistro = {};
-  leerTabla_(&#x27;Fotos&#x27;).forEach(function (f) {
+  leerTabla_('Fotos').forEach(function (f) {
     var rid = String(f.registroId);
     if (!fotosPorRegistro[rid]) fotosPorRegistro[rid] = [];
     fotosPorRegistro[rid].push({
@@ -328,15 +332,15 @@ function cargarTodo_() {
     });
   });
 
-  var torneos = leerTabla_(&#x27;Torneos&#x27;).map(function (f) {
+  var torneos = leerTabla_('Torneos').map(function (f) {
     var id = String(f.id);
-    var formato = String(f.formato || &#x27;liguilla&#x27;);
+    var formato = String(f.formato || 'liguilla');
     var partidos = partidosPorTorneo[id] || [];
 
     // La eliminatoria antigua se guarda plana, pero la app la necesita en
     // rondas. La reconstruimos agrupando por jornada (= ronda).
     var rounds = null;
-    if (formato === &#x27;eliminatoria&#x27;) {
+    if (formato === 'eliminatoria') {
       var porRonda = {};
       partidos.forEach(function (m) {
         var r = m.jornada || 1;
@@ -352,11 +356,16 @@ function cargarTodo_() {
       id: id,
       name: String(f.nombre),
       format: formato,
-      status: String(f.estado || &#x27;activo&#x27;),
+      status: String(f.estado || 'activo'),
       pointsPerGame: Number(f.puntosPorJuego) || 11,
       setsToWin: Number(f.juegosParaGanar) || 2,
+      // Reglas del saque. Se guardan como 'si'/'no' para que Sheets no las
+      // convierta en TRUE/FALSE; los torneos de antes de esta columna quedan
+      // con las reglas clásicas (cada 3, con ventaja).
+      saqueCada: Number(f.saqueCada) || 3,
+      ventajaPerdedor: String(f.ventajaPerdedor) === 'no' ? false : true,
       numJornadas: Number(f.numJornadas) || 1,
-      playerIds: String(f.jugadoresIds || &#x27;&#x27;).split(&#x27;,&#x27;).filter(String),
+      playerIds: String(f.jugadoresIds || '').split(',').filter(String),
       champion: f.campeonId ? String(f.campeonId) : null,
       createdAt: f.creadoEn ? new Date(f.creadoEn).getTime() : Date.now(),
       finishedAt: f.finalizadoEn ? new Date(f.finalizadoEn).getTime() : null,
@@ -366,16 +375,16 @@ function cargarTodo_() {
     };
   });
 
-  var sueltos = leerTabla_(&#x27;PartidosSueltos&#x27;).map(function (f) {
+  var sueltos = leerTabla_('PartidosSueltos').map(function (f) {
     var id = String(f.id);
     return {
       id: id,
-      modo: String(f.modo || &#x27;1vs1&#x27;),
-      equipoA: String(f.equipoAIds || &#x27;&#x27;).split(&#x27;,&#x27;).filter(String),
-      equipoB: String(f.equipoBIds || &#x27;&#x27;).split(&#x27;,&#x27;).filter(String),
+      modo: String(f.modo || '1vs1'),
+      equipoA: String(f.equipoAIds || '').split(',').filter(String),
+      equipoB: String(f.equipoBIds || '').split(',').filter(String),
       pointsPerGame: Number(f.puntosPorJuego) || 11,
-      ganador: String(f.ganadorLado || &#x27;A&#x27;),
-      scoreLabel: String(f.resultado || &#x27;&#x27;),
+      ganador: String(f.ganadorLado || 'A'),
+      scoreLabel: String(f.resultado || ''),
       games: parcialesParse_(f.parciales),
       playedAt: f.jugadoEn ? new Date(f.jugadoEn).getTime() : Date.now(),
       photos: fotosPorRegistro[id] || []
@@ -414,28 +423,30 @@ function guardarTodo_(datos) {
     var mapa = {};
     jugadores.forEach(function (j) { mapa[j.id] = j.name; });
 
-    escribirTabla_(&#x27;Jugadores&#x27;, jugadores.map(function (j) {
+    escribirTabla_('Jugadores', jugadores.map(function (j) {
       // Conservamos la fecha de alta original si ya estaba en la hoja.
       return {
         id: j.id,
         nombre: j.name,
         creadoEn: j.creadoEn || fecha_(Date.now()),
-        foto: j.photo || &#x27;&#x27;
+        foto: j.photo || ''
       };
     }));
 
-    escribirTabla_(&#x27;Torneos&#x27;, torneos.map(function (t) {
+    escribirTabla_('Torneos', torneos.map(function (t) {
       return {
         id: t.id,
         nombre: t.name,
-        formato: t.format || (t.rounds ? &#x27;eliminatoria&#x27; : &#x27;liguilla&#x27;),
+        formato: t.format || (t.rounds ? 'eliminatoria' : 'liguilla'),
         estado: t.status,
         puntosPorJuego: t.pointsPerGame,
         juegosParaGanar: t.setsToWin,
+        saqueCada: t.saqueCada || 3,
+        ventajaPerdedor: t.ventajaPerdedor === false ? 'no' : 'si',
         numJornadas: t.numJornadas,
-        jugadoresIds: (t.playerIds || []).join(&#x27;,&#x27;),
-        jugadoresNombres: nombresDe_(t.playerIds, mapa).split(&#x27; + &#x27;).join(&#x27;, &#x27;),
-        campeonId: t.champion || &#x27;&#x27;,
+        jugadoresIds: (t.playerIds || []).join(','),
+        jugadoresNombres: nombresDe_(t.playerIds, mapa).split(' + ').join(', '),
+        campeonId: t.champion || '',
         creadoEn: fecha_(t.createdAt),
         finalizadoEn: fecha_(t.finishedAt)
       };
@@ -456,26 +467,27 @@ function guardarTodo_(datos) {
           jugadorB: mapa[m.b] || m.b,
           jugadorAId: m.a,
           jugadorBId: m.b,
-          ganador: m.winner ? (mapa[m.winner] || m.winner) : &#x27;&#x27;,
-          ganadorId: m.winner || &#x27;&#x27;,
-          resultado: m.scoreLabel || &#x27;&#x27;,
+          ganador: m.winner ? (mapa[m.winner] || m.winner) : '',
+          ganadorId: m.winner || '',
+          resultado: m.scoreLabel || '',
           parciales: parcialesTexto_(m.sets),
-          jugadoEn: m.winner ? fecha_(t.finishedAt || Date.now()) : &#x27;&#x27;
+          jugadoEn: m.playedAt ? fecha_(m.playedAt)
+                  : (m.winner ? fecha_(t.finishedAt || Date.now()) : '')
         });
       });
     });
-    escribirTabla_(&#x27;Partidos&#x27;, filasPartidos);
+    escribirTabla_('Partidos', filasPartidos);
 
-    escribirTabla_(&#x27;PartidosSueltos&#x27;, sueltos.map(function (p) {
+    escribirTabla_('PartidosSueltos', sueltos.map(function (p) {
       return {
         id: p.id,
         modo: p.modo,
         equipoA: nombresDe_(p.equipoA, mapa),
         equipoB: nombresDe_(p.equipoB, mapa),
-        equipoAIds: (p.equipoA || []).join(&#x27;,&#x27;),
-        equipoBIds: (p.equipoB || []).join(&#x27;,&#x27;),
+        equipoAIds: (p.equipoA || []).join(','),
+        equipoBIds: (p.equipoB || []).join(','),
         puntosPorJuego: p.pointsPerGame,
-        ganador: p.ganador === &#x27;A&#x27; ? nombresDe_(p.equipoA, mapa) : nombresDe_(p.equipoB, mapa),
+        ganador: p.ganador === 'A' ? nombresDe_(p.equipoA, mapa) : nombresDe_(p.equipoB, mapa),
         ganadorLado: p.ganador,
         resultado: p.scoreLabel,
         parciales: parcialesTexto_(p.games),
@@ -503,21 +515,21 @@ function carpetaFotos_() {
  * En la hoja sólo se guarda el enlace: una celda no puede contener la imagen.
  */
 function subirFoto_(body) {
-  var base64 = String(body.dataUrl || &#x27;&#x27;).replace(/^data:image\/\w+;base64,/, &#x27;&#x27;);
+  var base64 = String(body.dataUrl || '').replace(/^data:image\/\w+;base64,/, '');
   var bytes = Utilities.base64Decode(base64);
-  var blob = Utilities.newBlob(bytes, &#x27;image/jpeg&#x27;, (body.nombre || &#x27;foto&#x27;) + &#x27;.jpg&#x27;);
+  var blob = Utilities.newBlob(bytes, 'image/jpeg', (body.nombre || 'foto') + '.jpg');
 
   var archivo = carpetaFotos_().createFile(blob);
   archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-  var url = &#x27;https://drive.google.com/thumbnail?id=&#x27; + archivo.getId() + &#x27;&amp;sz=w1600&#x27;;
-  var id = &#x27;f_&#x27; + archivo.getId();
+  var url = 'https://drive.google.com/thumbnail?id=' + archivo.getId() + '&amp;sz=w1600';
+  var id = 'f_' + archivo.getId();
 
-  hoja_(&#x27;Fotos&#x27;).appendRow([
+  hoja_('Fotos').appendRow([
     id,
-    String(body.registroId || &#x27;&#x27;),
-    String(body.tipo || &#x27;&#x27;),
-    String(body.descripcion || &#x27;&#x27;),
+    String(body.registroId || ''),
+    String(body.tipo || ''),
+    String(body.descripcion || ''),
     url,
     fecha_(Date.now())
   ]);

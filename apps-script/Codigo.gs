@@ -118,7 +118,8 @@ function partidosDe_(t) {
         a: m.a, b: m.b,
         winner: m.winner || null,
         sets: m.sets || [],
-        scoreLabel: m.scoreLabel || ''
+        scoreLabel: m.scoreLabel || '',
+        playedAt: m.playedAt || null
       });
     });
   });
@@ -206,7 +207,10 @@ function cargarTodo_() {
       b: String(f.jugadorBId),
       winner: f.ganadorId ? String(f.ganadorId) : null,
       sets: parcialesParse_(f.parciales),
-      scoreLabel: f.resultado ? String(f.resultado) : ''
+      scoreLabel: f.resultado ? String(f.resultado) : '',
+      // Fecha propia de cada partido (histórico). Los antiguos comparten la
+      // fecha de cierre del torneo porque no se guardaba nada más fino.
+      playedAt: f.jugadoEn ? new Date(f.jugadoEn).getTime() : null
     });
   });
 
@@ -248,6 +252,11 @@ function cargarTodo_() {
       status: String(f.estado || 'activo'),
       pointsPerGame: Number(f.puntosPorJuego) || 11,
       setsToWin: Number(f.juegosParaGanar) || 2,
+      // Reglas del saque. Se guardan como 'si'/'no' para que Sheets no las
+      // convierta en TRUE/FALSE; los torneos de antes de esta columna quedan
+      // con las reglas clásicas (cada 3, con ventaja).
+      saqueCada: Number(f.saqueCada) || 3,
+      ventajaPerdedor: String(f.ventajaPerdedor) === 'no' ? false : true,
       numJornadas: Number(f.numJornadas) || 1,
       playerIds: String(f.jugadoresIds || '').split(',').filter(String),
       champion: f.campeonId ? String(f.campeonId) : null,
@@ -325,6 +334,8 @@ function guardarTodo_(datos) {
         estado: t.status,
         puntosPorJuego: t.pointsPerGame,
         juegosParaGanar: t.setsToWin,
+        saqueCada: t.saqueCada || 3,
+        ventajaPerdedor: t.ventajaPerdedor === false ? 'no' : 'si',
         numJornadas: t.numJornadas,
         jugadoresIds: (t.playerIds || []).join(','),
         jugadoresNombres: nombresDe_(t.playerIds, mapa).split(' + ').join(', '),
@@ -353,7 +364,8 @@ function guardarTodo_(datos) {
           ganadorId: m.winner || '',
           resultado: m.scoreLabel || '',
           parciales: parcialesTexto_(m.sets),
-          jugadoEn: m.winner ? fecha_(t.finishedAt || Date.now()) : ''
+          jugadoEn: m.playedAt ? fecha_(m.playedAt)
+                  : (m.winner ? fecha_(t.finishedAt || Date.now()) : '')
         });
       });
     });

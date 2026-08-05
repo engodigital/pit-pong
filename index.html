@@ -385,6 +385,7 @@
   .stats-partido .comp{display:block;font-size:.72rem;opacity:.7;}
   .stats-partido .marcador{flex-shrink:0;font-weight:700;opacity:.85;}
   .stats-titulo{font-size:.8rem;font-weight:800;margin:6px 0 6px;opacity:.8;}
+  .parciales{font-size:.78em;opacity:.75;font-weight:400;white-space:nowrap;}
 
   /* Sin altura máxima ni scroll propio: dos listas con scroll interno una al
      lado de otra hacían muy difícil desplazar la página con el dedo. */
@@ -908,6 +909,18 @@
       </div>
     </div>
     <div class="card">
+      <h3>El saque cambia cada…</h3>
+      <div class="fila toggle-grupo" id="toggle-saque-torneo">
+        <button class="btn toggle-opcion" data-saque="2" style="flex:1;">2 puntos</button>
+        <button class="btn toggle-opcion activo" data-saque="3" style="flex:1;">3 puntos</button>
+        <button class="btn toggle-opcion" data-saque="5" style="flex:1;">5 puntos</button>
+      </div>
+      <div class="check-item marcado" id="check-ventaja-torneo" style="margin-top:8px;">
+        <span class="caja-check activa" id="caja-ventaja-torneo">✓</span>
+        <span id="texto-ventaja-torneo">Desde 10 puntos saca siempre quien va por detrás</span>
+      </div>
+    </div>
+    <div class="card">
       <h3>Selecciona los participantes</h3>
       <label class="check-item check-todos" id="check-todos-wrap">
         <input type="checkbox" id="check-todos">
@@ -961,6 +974,7 @@
     <div class="card" id="card-liga-rapido">
       <h3>¿Cuenta para una liga?</h3>
       <div id="opciones-liga-rapido"></div>
+      <div class="home-stats oculto" id="nota-reglas-liga" style="margin-top:8px;"></div>
     </div>
     <div class="fila" style="align-items:stretch;">
       <div class="card" style="flex:1;min-width:150px;">
@@ -1024,6 +1038,16 @@
             <option value="3">Mejor de 5</option>
           </select>
         </div>
+      </div>
+      <label style="margin-top:10px;">El saque cambia cada…</label>
+      <div class="fila toggle-grupo" id="toggle-saque-liga">
+        <button class="btn toggle-opcion" data-saque="2" style="flex:1;">2 puntos</button>
+        <button class="btn toggle-opcion activo" data-saque="3" style="flex:1;">3 puntos</button>
+        <button class="btn toggle-opcion" data-saque="5" style="flex:1;">5 puntos</button>
+      </div>
+      <div class="check-item marcado" id="check-ventaja-liga" style="margin-top:8px;">
+        <span class="caja-check activa" id="caja-ventaja-liga">✓</span>
+        <span id="texto-ventaja-liga">Desde 10 puntos saca siempre quien va por detrás</span>
       </div>
     </div>
     <div class="card">
@@ -1175,6 +1199,12 @@
         <option value="todo">Todo</option>
         <option value="torneo">Solo torneos</option>
         <option value="libre">Solo partidas sueltas</option>
+      </select>
+      <select class="orden" id="fecha-historial">
+        <option value="todo">📆 Cualquier fecha</option>
+        <option value="hoy">Hoy</option>
+        <option value="7">Últimos 7 días</option>
+        <option value="30">Últimos 30 días</option>
       </select>
     </div>
     <div id="lista-historial"></div>
@@ -1495,6 +1525,19 @@
     const d = new Date(ts);
     return d.toLocaleDateString("es-ES", {day:"2-digit",month:"short",year:"numeric"});
   }
+  // "(11-7, 9-11, 11-6)" — los parciales de cada juego, si el partido los tiene.
+  function parcialesLabel(sets){
+    return (sets && sets.length) ? sets.map(g=>g.a+"-"+g.b).join(", ") : "";
+  }
+  // Línea de resultado de un partido de torneo para el detalle del historial:
+  // "Marco 0 - 2 Ángel (5-11, 8-11) · 05 ago 2026"
+  function lineaPartidoHistorial(m, sinResultado){
+    let linea = escapeHtml(playerName(m.a)) + " " + (m.scoreLabel||sinResultado) + " " + escapeHtml(playerName(m.b));
+    const parc = parcialesLabel(m.sets);
+    if(parc) linea += ' <span class="parciales">('+parc+')</span>';
+    if(m.playedAt) linea += ' <span class="parciales">· '+formatDate(m.playedAt)+'</span>';
+    return linea + "<br>";
+  }
 
   /* ===================== NAVEGACIÓN ===================== */
   const viewStack = [];
@@ -1618,7 +1661,9 @@
           rival: playerName(rivalId),
           comp: t.name,
           marcador: m.scoreLabel || "",
-          orden: (t.createdAt||0) + (m.jornada||0)
+          parciales: parcialesLabel(m.sets),
+          fecha: m.playedAt || null,
+          orden: m.playedAt || ((t.createdAt||0) + (m.jornada||0))
         });
       }));
     });
@@ -1636,6 +1681,8 @@
           ? "Partida 2vs2" + (companeros.length ? " (con "+companeros.join(" + ")+")" : "")
           : "Partida suelta",
         marcador: p.scoreLabel || "",
+        parciales: parcialesLabel(p.games),
+        fecha: p.playedAt || null,
         orden: p.playedAt || 0
       });
     });
@@ -1675,8 +1722,9 @@
           '<div class="stats-partido">'+
             '<span class="res '+(x.gano?"v":"d")+'">'+(x.gano?"✓":"✗")+'</span>'+
             '<span class="detalle">vs '+escapeHtml(x.rival)+
-              '<span class="comp">'+escapeHtml(x.comp)+'</span></span>'+
-            (x.marcador ? '<span class="marcador">'+escapeHtml(x.marcador)+'</span>' : '')+
+              '<span class="comp">'+escapeHtml(x.comp)+(x.fecha ? ' · '+formatDate(x.fecha) : '')+'</span></span>'+
+            (x.marcador ? '<span class="marcador">'+escapeHtml(x.marcador)+
+              (x.parciales ? ' <span class="parciales">('+escapeHtml(x.parciales)+')</span>' : '')+'</span>' : '')+
           '</div>'
         ).join("")+
       '</div>';
@@ -1864,8 +1912,31 @@
 
   /* ===================== CREAR TORNEO ===================== */
   let seleccionados = new Set();
+  let saqueTorneo = 3;
+  let ventajaTorneo = true;
+
+  // El texto y el estado visual del check de ventaja se comparten entre las
+  // tres pantallas de configuración (torneo, liga y partida suelta).
+  function pintarCheckVentaja(sufijo, activo, puntos){
+    const item = document.getElementById("check-ventaja-"+sufijo);
+    const caja = document.getElementById("caja-ventaja-"+sufijo);
+    item.classList.toggle("marcado", activo);
+    caja.classList.toggle("activa", activo);
+    caja.textContent = activo ? "✓" : "";
+    document.getElementById("texto-ventaja-"+sufijo).textContent =
+      "Desde " + (puntos - 1) + " puntos saca siempre quien va por detrás";
+  }
+  function pintarToggleSaque(grupoId, valor){
+    document.querySelectorAll("#"+grupoId+" .toggle-opcion")
+      .forEach(b=>b.classList.toggle("activo", b.dataset.saque===String(valor)));
+  }
+
   function renderCrear(){
     seleccionados = new Set();
+    saqueTorneo = 3;
+    ventajaTorneo = true;
+    pintarToggleSaque("toggle-saque-torneo", saqueTorneo);
+    pintarCheckVentaja("torneo", ventajaTorneo, parseInt(document.getElementById("input-puntos-juego").value,10) || 11);
     document.getElementById("input-nombre-torneo").value = "";
     document.getElementById("input-puntos-juego").value = 11;
     document.getElementById("input-sets").value = "2";
@@ -1914,13 +1985,27 @@
     actualizaSeleccionInfo();
   });
 
+  document.querySelectorAll("#toggle-saque-torneo .toggle-opcion").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      saqueTorneo = parseInt(btn.dataset.saque,10);
+      pintarToggleSaque("toggle-saque-torneo", saqueTorneo);
+    });
+  });
+  document.getElementById("check-ventaja-torneo").addEventListener("click", ()=>{
+    ventajaTorneo = !ventajaTorneo;
+    pintarCheckVentaja("torneo", ventajaTorneo, parseInt(document.getElementById("input-puntos-juego").value,10) || 11);
+  });
+  document.getElementById("input-puntos-juego").addEventListener("input", ()=>{
+    pintarCheckVentaja("torneo", ventajaTorneo, parseInt(document.getElementById("input-puntos-juego").value,10) || 11);
+  });
+
   document.getElementById("btn-generar-torneo").addEventListener("click", ()=>{
     const nombre = document.getElementById("input-nombre-torneo").value.trim() || "Torneo sin nombre";
     const puntos = Math.max(5, parseInt(document.getElementById("input-puntos-juego").value,10) || 11);
     const setsToWin = parseInt(document.getElementById("input-sets").value,10);
     const ids = Array.from(seleccionados);
     if(ids.length < 2){ alert("Selecciona al menos 2 jugadores."); return; }
-    const t = crearTorneo(nombre, ids, puntos, setsToWin);
+    const t = crearTorneo(nombre, ids, puntos, setsToWin, saqueTorneo, ventajaTorneo);
     tournaments.push(t);
     saveTournaments(tournaments);
     currentBracketId = t.id;
@@ -1964,16 +2049,30 @@
       item.addEventListener("click", ()=>{ ligaRapidaId = o.id; renderOpcionesLigaRapido(); });
       cont.appendChild(item);
     });
+    mostrarReglasSegunLiga();
+  }
+
+  /**
+   * Si el partido cuenta para una liga, mandan las reglas de la liga: se
+   * ocultan las tarjetas de configuración para que no se pueda jugar un
+   * partido de liga con reglas distintas (distorsionaría la clasificación).
+   */
+  function mostrarReglasSegunLiga(){
+    const liga = ligaRapidaId ? getLiga(ligaRapidaId) : null;
+    ["toggle-puntos","toggle-sets-rapido","toggle-saque"].forEach(id=>{
+      document.getElementById(id).closest(".card").classList.toggle("oculto", !!liga);
+    });
+    const nota = document.getElementById("nota-reglas-liga");
+    nota.classList.toggle("oculto", !liga);
+    if(liga){
+      nota.textContent = "Se aplican las reglas de la liga: a "+liga.pointsPerGame+
+        " puntos, al mejor de "+(liga.setsToWin*2-1)+" juego(s), saque cada "+(liga.saqueCada||3)+
+        " puntos"+(liga.ventajaPerdedor!==false ? " y desde "+(liga.pointsPerGame-1)+" saca quien va por detrás" : ", sin regla de ventaja")+".";
+    }
   }
 
   function renderAvisoVentajaRapido(){
-    const item = document.getElementById("check-ventaja-rapido");
-    const caja = document.getElementById("caja-ventaja-rapido");
-    item.classList.toggle("marcado", ventajaRapido);
-    caja.classList.toggle("activa", ventajaRapido);
-    caja.textContent = ventajaRapido ? "✓" : "";
-    document.getElementById("texto-ventaja-rapido").textContent =
-      "Desde " + (puntosRapido - 1) + " puntos saca siempre quien va por detrás";
+    pintarCheckVentaja("rapido", ventajaRapido, puntosRapido);
   }
 
   function renderJugarRapido(){
@@ -2112,11 +2211,9 @@
       saveTournaments(tournaments);
       currentLigaId = liga.id;
       currentScorerCtx = {tournamentId: liga.id, matchId: partido.id};
+      // Las reglas las pone la liga (iniciarScorer las lee del torneo);
+      // lo elegido en esta pantalla sólo vale para partidos sueltos.
       iniciarScorer(liga, partido);
-      scorerState.pointsPerGame = puntosRapido;
-      scorerState.setsToWin = setsRapido;
-      scorerState.saqueCada = saqueRapido;
-      scorerState.ventajaPerdedor = ventajaRapido;
     } else {
       iniciarScorerLibre(modoRapido, equipoASel.slice(), equipoBSel.slice(), puntosRapido);
       scorerState.setsToWin = setsRapido;
@@ -2165,7 +2262,7 @@
     return jornadas;
   }
 
-  function crearTorneo(nombre, playerIds, puntos, setsToWin){
+  function crearTorneo(nombre, playerIds, puntos, setsToWin, saqueCada, ventajaPerdedor){
     const jornadas = generarJornadas(playerIds);
     const matches = [];
     jornadas.forEach((jornada, jIdx)=>{
@@ -2185,6 +2282,8 @@
       status: "activo",
       pointsPerGame: puntos,
       setsToWin: setsToWin,
+      saqueCada: saqueCada || 3,
+      ventajaPerdedor: ventajaPerdedor !== false,
       createdAt: Date.now(),
       finishedAt: null,
       playerIds: playerIds.slice(),
@@ -2261,35 +2360,54 @@
     const sinRes = document.getElementById("continuar-sin-resultados");
     const texto = document.getElementById("buscar-continuar").value.trim();
     const orden = document.getElementById("orden-continuar").value;
-    const todosActivos = tournaments.filter(t=>t.status==="activo" && !esLiga(t));
-    let activos = todosActivos.filter(t=>coincideTorneo(t, texto));
-    activos.sort((x,y)=>{
+    // Los finalizados también se listan (debajo, en solo lectura): "el torneo
+    // de hoy" tiene que poder encontrarse aquí aunque ya haya terminado.
+    const todosTorneos = tournaments.filter(t=>!esLiga(t));
+    const ordenar = lista => lista.sort((x,y)=>{
       if(orden==="antiguo") return (x.createdAt||0) - (y.createdAt||0);
       if(orden==="nombre") return String(x.name).localeCompare(String(y.name), "es");
       if(orden==="pendientes") return contarPendientes(y) - contarPendientes(x);
       return (y.createdAt||0) - (x.createdAt||0);
     });
-    sinRes.classList.toggle("oculto", !(todosActivos.length > 0 && activos.length === 0));
-    document.querySelector("#view-continuar .filtros").classList.toggle("oculto", todosActivos.length === 0);
+    const coinciden = todosTorneos.filter(t=>coincideTorneo(t, texto));
+    const activos = ordenar(coinciden.filter(t=>t.status==="activo"));
+    const finalizados = ordenar(coinciden.filter(t=>t.status!=="activo"));
+    sinRes.classList.toggle("oculto", !(todosTorneos.length > 0 && coinciden.length === 0));
+    document.querySelector("#view-continuar .filtros").classList.toggle("oculto", todosTorneos.length === 0);
     cont.innerHTML = "";
     // "No hay torneos" sólo si de verdad no hay ninguno; si la búsqueda no
     // encuentra nada, el mensaje correcto es el de sin resultados.
-    vacio.classList.toggle("oculto", todosActivos.length > 0);
-    if(activos.length===0) return;
-    activos.forEach(t=>{
+    vacio.classList.toggle("oculto", todosTorneos.length > 0);
+    const pintar = t => {
       const div = document.createElement("div");
       div.className = "card hist-card";
-      const pendientes = contarPendientes(t);
-      div.innerHTML =
-        '<h3>'+escapeHtml(t.name)+'</h3>'+
-        '<div class="home-stats">'+t.playerIds.length+' jugadores · creado '+formatDate(t.createdAt)+'</div>'+
-        '<div class="home-stats">'+pendientes+' partido(s) pendiente(s) por jugar</div>';
+      if(t.status==="activo"){
+        const pendientes = contarPendientes(t);
+        div.innerHTML =
+          '<h3>'+escapeHtml(t.name)+'</h3>'+
+          '<div class="home-stats">'+t.playerIds.length+' jugadores · creado '+formatDate(t.createdAt)+'</div>'+
+          '<div class="home-stats">'+pendientes+' partido(s) pendiente(s) por jugar</div>';
+      } else {
+        div.innerHTML =
+          '<h3>'+escapeHtml(t.name)+'</h3>'+
+          '<div class="home-stats">'+t.playerIds.length+' jugadores · finalizado el '+formatDate(t.finishedAt || t.createdAt)+'</div>'+
+          '<div class="campeon-tag">🏆 '+escapeHtml(playerName(t.champion))+'</div>';
+      }
       div.addEventListener("click", ()=>{
         currentBracketId = t.id;
         showView("bracket", {titulo: t.name});
       });
       cont.appendChild(div);
-    });
+    };
+    activos.forEach(pintar);
+    if(finalizados.length){
+      const sep = document.createElement("div");
+      sep.className = "ronda-titulo";
+      sep.style.marginTop = "14px";
+      sep.textContent = "Finalizados";
+      cont.appendChild(sep);
+      finalizados.forEach(pintar);
+    }
   }
   function contarPendientes(t){
     if(esLiguilla(t)) return t.matches.filter(m=>!m.winner).length;
@@ -2412,7 +2530,12 @@
       '<div class="match-jugador '+claseA+'"><span>'+escapeHtml(playerName(m.a))+'</span></div>'+
       '<div class="match-vs">vs</div>'+
       '<div class="match-jugador '+claseB+'"><span>'+escapeHtml(playerName(m.b))+'</span></div>';
-    if(m.winner) html += '<div class="match-estado">'+escapeHtml(m.scoreLabel)+'</div>';
+    if(m.winner){
+      const parc = parcialesLabel(m.sets);
+      html += '<div class="match-estado">'+escapeHtml(m.scoreLabel)+
+        (parc ? ' <span class="parciales">('+parc+')</span>' : '')+
+        (m.playedAt ? ' <span class="parciales">· '+formatDate(m.playedAt)+'</span>' : '')+'</div>';
+    }
     else html += '<button class="btn dorado btn-jugar">▶ Jugar partido</button>';
     div.innerHTML = html;
     const btn = div.querySelector(".btn-jugar");
@@ -2448,7 +2571,10 @@
     html += '<div class="match-vs">vs</div>';
     html += '<div class="match-jugador '+claseB+'"><span>'+(m.b?escapeHtml(playerName(m.b)):"—")+'</span></div>';
     if(m.scoreLabel){
-      html += '<div class="match-estado">'+escapeHtml(m.scoreLabel)+'</div>';
+      const parc = parcialesLabel(m.sets);
+      html += '<div class="match-estado">'+escapeHtml(m.scoreLabel)+
+        (parc ? ' <span class="parciales">('+parc+')</span>' : '')+
+        (m.playedAt ? ' <span class="parciales">· '+formatDate(m.playedAt)+'</span>' : '')+'</div>';
     } else if(m.a && m.b && !m.winner){
       html += '<button class="btn dorado btn-jugar">▶ Jugar partido</button>';
     } else if(!m.a || !m.b){
@@ -2502,8 +2628,10 @@
       pointsLog: [],
       games: [],
       startServer: "a",
-      saqueCada: 3,
-      ventajaPerdedor: true,
+      // Las reglas viven en el torneo/liga; los guardados antiguos no las
+      // tienen y usan las de siempre (cada 3, con ventaja).
+      saqueCada: t.saqueCada || 3,
+      ventajaPerdedor: t.ventajaPerdedor !== false,
       ladosCambiados: false
     };
     prepararUIScorer();
@@ -2594,13 +2722,19 @@
   }
 
   /* ---- crear liga ---- */
+  let saqueLiga = 3;
+  let ventajaLiga = true;
   function renderCrearLiga(){
     seleccionLiga = new Set();
     puntosLiga = 11;
+    saqueLiga = 3;
+    ventajaLiga = true;
     document.getElementById("input-nombre-liga").value = "";
     document.getElementById("input-sets-liga").value = "2";
     document.querySelectorAll("#toggle-puntos-liga .toggle-opcion")
       .forEach(b=>b.classList.toggle("activo", b.dataset.puntos==="11"));
+    pintarToggleSaque("toggle-saque-liga", saqueLiga);
+    pintarCheckVentaja("liga", ventajaLiga, puntosLiga);
     renderChecklistLiga();
   }
 
@@ -2640,7 +2774,18 @@
       puntosLiga = parseInt(btn.dataset.puntos,10);
       document.querySelectorAll("#toggle-puntos-liga .toggle-opcion")
         .forEach(b=>b.classList.toggle("activo", b===btn));
+      pintarCheckVentaja("liga", ventajaLiga, puntosLiga);
     });
+  });
+  document.querySelectorAll("#toggle-saque-liga .toggle-opcion").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      saqueLiga = parseInt(btn.dataset.saque,10);
+      pintarToggleSaque("toggle-saque-liga", saqueLiga);
+    });
+  });
+  document.getElementById("check-ventaja-liga").addEventListener("click", ()=>{
+    ventajaLiga = !ventajaLiga;
+    pintarCheckVentaja("liga", ventajaLiga, puntosLiga);
   });
 
   document.getElementById("btn-generar-liga").addEventListener("click", ()=>{
@@ -2653,6 +2798,8 @@
       status: "activo",
       pointsPerGame: puntosLiga,
       setsToWin: parseInt(document.getElementById("input-sets-liga").value,10),
+      saqueCada: saqueLiga,
+      ventajaPerdedor: ventajaLiga,
       createdAt: Date.now(),
       finishedAt: null,
       playerIds: ids,
@@ -2699,9 +2846,12 @@
     jugadosLista.forEach(m=>{
       const div = document.createElement("div");
       div.className = "jugador-item";
+      const parc = parcialesLabel(m.sets);
       div.innerHTML =
-        '<div class="jugador-nombre">'+escapeHtml(playerName(m.a))+' vs '+escapeHtml(playerName(m.b))+'</div>'+
-        '<div class="campeon-tag" style="margin:0;">'+escapeHtml(playerName(m.winner))+' '+escapeHtml(m.scoreLabel||"")+'</div>';
+        '<div class="jugador-nombre">'+escapeHtml(playerName(m.a))+' vs '+escapeHtml(playerName(m.b))+
+          (m.playedAt ? ' <span class="parciales">'+formatDate(m.playedAt)+'</span>' : '')+'</div>'+
+        '<div class="campeon-tag" style="margin:0;">'+escapeHtml(playerName(m.winner))+' '+escapeHtml(m.scoreLabel||"")+
+          (parc ? ' <span class="parciales">('+parc+')</span>' : '')+'</div>';
       cont.appendChild(div);
     });
   }
@@ -2783,7 +2933,7 @@
     el.addEventListener("input", renderContinuar);
     el.addEventListener("change", renderContinuar);
   });
-  ["buscar-historial","orden-historial","tipo-historial"].forEach(id=>{
+  ["buscar-historial","orden-historial","tipo-historial","fecha-historial"].forEach(id=>{
     const el = document.getElementById(id);
     el.addEventListener("input", renderHistorial);
     el.addEventListener("change", renderHistorial);
@@ -3141,6 +3291,7 @@
         match.winner = ganadorLado.ids[0];
         match.sets = scorerState.games;
         match.scoreLabel = scoreLabel;
+        match.playedAt = Date.now();
         // Una liga no termina nunca sola: se le van añadiendo partidos.
         // Una liguilla sí (cuando se juegan todos). Y la eliminatoria
         // antigua hace avanzar al ganador a la ronda siguiente.
@@ -3200,13 +3351,21 @@
     const texto = document.getElementById("buscar-historial").value.trim();
     const orden = document.getElementById("orden-historial").value;
     const tipo = document.getElementById("tipo-historial").value;
+    const rangoFecha = document.getElementById("fecha-historial").value;
 
     const itemsTorneos = tournaments.filter(t=>t.status==="finalizado" && !esLiga(t)).map(t=>({tipo:"torneo", obj:t, fecha:t.finishedAt}));
     const itemsSueltos = partidosSueltos.map(p=>({tipo:"libre", obj:p, fecha:p.playedAt}));
     const todos = itemsTorneos.concat(itemsSueltos);
 
+    // "Hoy" = desde la medianoche local; 7/30 días = ventana móvil.
+    let desde = 0;
+    if(rangoFecha==="hoy") desde = new Date().setHours(0,0,0,0);
+    else if(rangoFecha==="7") desde = Date.now() - 7*24*60*60*1000;
+    else if(rangoFecha==="30") desde = Date.now() - 30*24*60*60*1000;
+
     let items = todos
       .filter(r => tipo==="todo" || r.tipo===tipo)
+      .filter(r => !desde || (r.fecha || 0) >= desde)
       .filter(r => coincideRegistro(r, texto));
     items.sort((x,y)=>{
       if(orden==="antiguo") return (x.fecha||0) - (y.fecha||0);
@@ -3270,7 +3429,7 @@
           if(!deJornada.length) continue;
           bracketResumen += "<strong>Jornada "+j+":</strong><br>";
           deJornada.forEach(m=>{
-            bracketResumen += escapeHtml(playerName(m.a)) + " " + (m.scoreLabel||"—") + " " + escapeHtml(playerName(m.b)) + "<br>";
+            bracketResumen += lineaPartidoHistorial(m, "—");
           });
         }
       } else {
@@ -3279,7 +3438,7 @@
           bracketResumen += "<strong>"+nombres[rIdx]+":</strong><br>";
           round.forEach(m=>{
             if(m.a || m.b){
-              bracketResumen += escapeHtml(playerName(m.a)) + " " + (m.scoreLabel||"?") + " " + escapeHtml(playerName(m.b)) + "<br>";
+              bracketResumen += lineaPartidoHistorial(m, "?");
             }
           });
         });

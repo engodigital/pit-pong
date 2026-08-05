@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pit Pong — Conectar Google Sheets</title>
+<style>
+  :root{
+    --verde:#1D5523; --verde-oscuro:#123D1A; --rojo:#943026; --dorado:#C28C42;
+    --madera:#965828; --madera-oscura:#5B2A17; --azul:#28708F;
+    --crema:#E6CFB0; --tinta:#1A1108;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:0 16px 60px;
+    background:var(--crema);
+    color:var(--tinta);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;
+  }
+  .wrap{max-width:860px;margin:0 auto;}
+  header{
+    background:var(--verde); color:#fff; margin:0 -16px 24px;
+    padding:26px 20px; text-align:center;
+    box-shadow:0 4px 14px rgba(26,17,8,.35);
+  }
+  header h1{
+    margin:0 0 6px; font-family:"Arial Black",Arial,sans-serif;
+    font-size:1.9rem; letter-spacing:.5px; color:var(--dorado);
+    text-shadow:2px 2px 0 var(--tinta);
+  }
+  header p{margin:0;font-size:.9rem;opacity:.9;}
+  .paso{
+    background:#fff8ec; border:2px solid var(--madera); border-radius:14px;
+    padding:18px 20px; margin-bottom:16px;
+    box-shadow:0 4px 14px rgba(26,17,8,.18);
+  }
+  .paso h2{
+    margin:0 0 10px; font-size:1.1rem; color:var(--madera-oscura);
+    display:flex; align-items:center; gap:10px;
+  }
+  .num{
+    background:var(--verde); color:#fff; width:30px; height:30px; flex-shrink:0;
+    border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:.95rem;
+  }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:13px 22px; border-radius:10px; border:none; cursor:pointer;
+    font-weight:800; font-size:1rem; color:#fff; background:var(--verde);
+    text-decoration:none; box-shadow:0 2px 6px rgba(26,17,8,.25);
+    font-family:inherit;
+  }
+  .btn:active{opacity:.85;}
+  .btn.dorado{background:var(--dorado); color:var(--tinta);}
+  .btn.azul{background:var(--azul);}
+  .btn.copiado{background:var(--verde-oscuro);}
+  .btn.fallo{background:var(--rojo);}
+  .btn-grande{width:100%; font-size:1.1rem; padding:16px;}
+  code, .campo{
+    background:#f0e3c6; border:1px solid var(--madera);
+    padding:2px 7px; border-radius:5px; font-size:.9em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  .campo{display:inline-block; font-weight:700; color:var(--madera-oscura);}
+  .aviso{
+    background:var(--dorado); color:var(--tinta); border-radius:10px;
+    padding:12px 14px; margin:12px 0; font-weight:700; font-size:.9rem;
+  }
+  .aviso.rojo{background:#f7ddd8; border:2px solid var(--rojo); color:var(--madera-oscura);}
+  ul{margin:8px 0; padding-left:22px;}
+  li{margin-bottom:6px;}
+  pre{
+    background:var(--tinta); color:#e8e0d0; padding:14px; border-radius:10px;
+    overflow-x:auto; max-height:260px; font-size:.72rem; line-height:1.4;
+    margin:12px 0 0;
+  }
+  .estado-copia{
+    font-size:.85rem; font-weight:700; margin-top:10px; min-height:1.3em;
+    color:var(--verde-oscuro);
+  }
+  .estado-copia.error{color:var(--rojo);}
+  details summary{cursor:pointer; font-weight:700; color:var(--madera-oscura); font-size:.9rem;}
+  footer{text-align:center; font-size:.75rem; color:var(--madera-oscura); opacity:.75; margin-top:24px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Conectar Pit Pong con Google Sheets</h1>
+    <p>3 pasos · unos 2 minutos · así los resultados se ven desde cualquier dispositivo</p>
+  </header>
+
+  <div class="paso">
+    <h2><span class="num">1</span> Abrir el editor de Apps Script</h2>
+    <p>Abre la hoja y ve al menú <span class="campo">Extensiones</span> &rarr; <span class="campo">Apps Script</span>.</p>
+    <a class="btn azul btn-grande" href="https://docs.google.com/spreadsheets/d/1jyQZHeDxSvT0xkJ5Rlcg86d3a7uW8QjQ08ym8h7NVGU/edit?authuser=marketing.engoagency@gmail.com" target="_blank">📊 Abrir la hoja Pit Pong DB</a>
+    <div class="aviso">Si te dice que no tienes acceso, arriba a la derecha cambia a la cuenta <strong>marketing.engoagency@gmail.com</strong> — la hoja es tuya, solo hay que abrirla con la cuenta correcta.</div>
+  </div>
+
+  <div class="paso">
+    <h2><span class="num">2</span> Pegar el código</h2>
+    <p>En el editor, <strong>borra todo</strong> lo que haya (suele venir un <code>function myFunction() {}</code>) y pega esto. Luego guarda con <span class="campo">⌘ S</span>.</p>
+    <button class="btn dorado btn-grande" id="btn-copiar">📋 Copiar el código</button>
+    <div class="estado-copia" id="estado"></div>
+    <details style="margin-top:12px;">
+      <summary>Ver el código (no hace falta entenderlo)</summary>
+      <pre id="codigo">/**
+ * Pit Pong — backend en Google Sheets + Drive
+ *
+ * Guarda jugadores, torneos, partidos y fotos para que la app se vea igual
+ * desde cualquier móvil, tablet u ordenador.
+ *
+ * CÓMO SE USA (ya está hecho, esto es sólo referencia):
+ *   1. Hoja de cálculo &quot;Pit Pong DB&quot; (ID abajo).
+ *   2. Implementar &gt; Nueva implementación &gt; Aplicación web
+ *      - Ejecutar como: Yo
+ *      - Quién tiene acceso: Cualquier usuario
+ *   3. Pegar la URL /exec en PITPONG_API de index.html
+ *
+ * IMPORTANTE: la app envía Content-Type &quot;text/plain&quot; a propósito. Con
+ * &quot;application/json&quot; el navegador haría una petición previa OPTIONS que
+ * Apps Script no sabe responder, y todas las llamadas fallarían por CORS.
+ */
+
+var SHEET_ID = &#x27;1jyQZHeDxSvT0xkJ5Rlcg86d3a7uW8QjQ08ym8h7NVGU&#x27;;
+var CARPETA_FOTOS = &#x27;Pit Pong - Fotos&#x27;;
+
+function ss_() { return SpreadsheetApp.openById(SHEET_ID); }
+
+function hoja_(nombre) {
+  var h = ss_().getSheetByName(nombre);
+  if (!h) throw new Error(&#x27;Falta la hoja &quot;&#x27; + nombre + &#x27;&quot; en Pit Pong DB&#x27;);
+  return h;
+}
+
+function json_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/** Lee una hoja como array de objetos usando la fila 1 como cabecera. */
+function leerTabla_(nombre) {
+  var datos = hoja_(nombre).getDataRange().getValues();
+  if (datos.length &lt; 2) return [];
+  var cab = datos[0];
+  var filas = [];
+  for (var i = 1; i &lt; datos.length; i++) {
+    if (String(datos[i][0]).trim() === &#x27;&#x27;) continue; // fila vacía
+    var o = {};
+    for (var c = 0; c &lt; cab.length; c++) o[cab[c]] = datos[i][c];
+    filas.push(o);
+  }
+  return filas;
+}
+
+/** Sustituye todo el contenido de una hoja (menos la cabecera). */
+function escribirTabla_(nombre, filas) {
+  var h = hoja_(nombre);
+  var cab = h.getRange(1, 1, 1, h.getLastColumn()).getValues()[0];
+  if (h.getLastRow() &gt; 1) {
+    h.getRange(2, 1, h.getLastRow() - 1, h.getLastColumn()).clearContent();
+  }
+  if (!filas.length) return;
+  var matriz = filas.map(function (f) {
+    return cab.map(function (col) {
+      var v = f[col];
+      return (v === undefined || v === null) ? &#x27;&#x27; : v;
+    });
+  });
+  h.getRange(2, 1, matriz.length, cab.length).setValues(matriz);
+}
+
+/* ============ Conversión entre el modelo de la app y las hojas ============ */
+
+function nombresDe_(ids, mapaJugadores) {
+  return (ids || []).map(function (id) {
+    return mapaJugadores[id] || id;
+  }).join(&#x27; + &#x27;);
+}
+
+function parcialesTexto_(games) {
+  return (games || []).map(function (g) { return g.a + &#x27;-&#x27; + g.b; }).join(&#x27; | &#x27;);
+}
+
+function parcialesParse_(texto) {
+  if (!texto) return [];
+  return String(texto).split(&#x27;|&#x27;).map(function (p) {
+    var m = p.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+    return m ? { a: Number(m[1]), b: Number(m[2]) } : null;
+  }).filter(function (x) { return x; });
+}
+
+function fecha_(ms) {
+  if (!ms) return &#x27;&#x27;;
+  return Utilities.formatDate(new Date(Number(ms)), Session.getScriptTimeZone(), &#x27;yyyy-MM-dd HH:mm:ss&#x27;);
+}
+
+/* ============================ API ============================ */
+
+function doGet(e) {
+  try {
+    return json_({ ok: true, datos: cargarTodo_() });
+  } catch (err) {
+    return json_({ ok: false, error: String(err) });
+  }
+}
+
+function doPost(e) {
+  try {
+    var body = JSON.parse(e.postData.contents);
+    var accion = body.accion;
+
+    if (accion === &#x27;guardar&#x27;) {
+      guardarTodo_(body.datos);
+      return json_({ ok: true, datos: cargarTodo_() });
+    }
+    if (accion === &#x27;cargar&#x27;) {
+      return json_({ ok: true, datos: cargarTodo_() });
+    }
+    if (accion === &#x27;subirFoto&#x27;) {
+      return json_({ ok: true, foto: subirFoto_(body) });
+    }
+    return json_({ ok: false, error: &#x27;Acción desconocida: &#x27; + accion });
+  } catch (err) {
+    return json_({ ok: false, error: String(err) });
+  }
+}
+
+/* ------------------------------ CARGAR ------------------------------ */
+
+function cargarTodo_() {
+  var jugadores = leerTabla_(&#x27;Jugadores&#x27;).map(function (f) {
+    return { id: String(f.id), name: String(f.nombre), creadoEn: f.creadoEn || &#x27;&#x27; };
+  });
+
+  var partidosPorTorneo = {};
+  leerTabla_(&#x27;Partidos&#x27;).forEach(function (f) {
+    var tid = String(f.torneoId);
+    if (!partidosPorTorneo[tid]) partidosPorTorneo[tid] = [];
+    // Las columnas con nombre son para leerlas nosotros; la app trabaja
+    // siempre con los ids (columnas ...Id), que son los que no cambian
+    // aunque se renombre a un jugador.
+    partidosPorTorneo[tid].push({
+      id: String(f.id),
+      jornada: Number(f.jornada) || 1,
+      a: String(f.jugadorAId),
+      b: String(f.jugadorBId),
+      winner: f.ganadorId ? String(f.ganadorId) : null,
+      sets: parcialesParse_(f.parciales),
+      scoreLabel: f.resultado ? String(f.resultado) : &#x27;&#x27;
+    });
+  });
+
+  var fotosPorRegistro = {};
+  leerTabla_(&#x27;Fotos&#x27;).forEach(function (f) {
+    var rid = String(f.registroId);
+    if (!fotosPorRegistro[rid]) fotosPorRegistro[rid] = [];
+    fotosPorRegistro[rid].push({
+      id: String(f.id),
+      dataUrl: String(f.urlDrive),
+      addedAt: f.subidoEn ? new Date(f.subidoEn).getTime() : Date.now()
+    });
+  });
+
+  var torneos = leerTabla_(&#x27;Torneos&#x27;).map(function (f) {
+    var id = String(f.id);
+    return {
+      id: id,
+      name: String(f.nombre),
+      format: &#x27;liguilla&#x27;,
+      status: String(f.estado || &#x27;activo&#x27;),
+      pointsPerGame: Number(f.puntosPorJuego) || 11,
+      setsToWin: Number(f.juegosParaGanar) || 2,
+      numJornadas: Number(f.numJornadas) || 1,
+      playerIds: String(f.jugadoresIds || &#x27;&#x27;).split(&#x27;,&#x27;).filter(String),
+      champion: f.campeonId ? String(f.campeonId) : null,
+      createdAt: f.creadoEn ? new Date(f.creadoEn).getTime() : Date.now(),
+      finishedAt: f.finalizadoEn ? new Date(f.finalizadoEn).getTime() : null,
+      matches: partidosPorTorneo[id] || [],
+      photos: fotosPorRegistro[id] || []
+    };
+  });
+
+  var sueltos = leerTabla_(&#x27;PartidosSueltos&#x27;).map(function (f) {
+    var id = String(f.id);
+    return {
+      id: id,
+      modo: String(f.modo || &#x27;1vs1&#x27;),
+      equipoA: String(f.equipoAIds || &#x27;&#x27;).split(&#x27;,&#x27;).filter(String),
+      equipoB: String(f.equipoBIds || &#x27;&#x27;).split(&#x27;,&#x27;).filter(String),
+      pointsPerGame: Number(f.puntosPorJuego) || 11,
+      ganador: String(f.ganadorLado || &#x27;A&#x27;),
+      scoreLabel: String(f.resultado || &#x27;&#x27;),
+      games: parcialesParse_(f.parciales),
+      playedAt: f.jugadoEn ? new Date(f.jugadoEn).getTime() : Date.now(),
+      photos: fotosPorRegistro[id] || []
+    };
+  });
+
+  return { jugadores: jugadores, torneos: torneos, partidosSueltos: sueltos };
+}
+
+/* ------------------------------ GUARDAR ------------------------------ */
+
+/**
+ * Fusiona por id en vez de reemplazar. Si dos dispositivos tienen estados
+ * distintos, el que guarda no borra lo que el otro añadió: sólo pisa los
+ * registros con el mismo id y elimina los que se borraron a propósito.
+ */
+function mergePorId_(base, entrantes, borrados) {
+  var mapa = {};
+  (base || []).forEach(function (r) { mapa[r.id] = r; });
+  (entrantes || []).forEach(function (r) { mapa[r.id] = r; });
+  (borrados || []).forEach(function (id) { delete mapa[id]; });
+  return Object.keys(mapa).map(function (k) { return mapa[k]; });
+}
+
+function guardarTodo_(datos) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(25000); // dos tablets guardando a la vez no se pisan
+  try {
+    var actual = cargarTodo_();
+    var elim = datos.eliminados || {};
+
+    var jugadores = mergePorId_(actual.jugadores, datos.jugadores, elim.jugadores);
+    var torneos = mergePorId_(actual.torneos, datos.torneos, elim.torneos);
+    var sueltos = mergePorId_(actual.partidosSueltos, datos.partidosSueltos, elim.partidosSueltos);
+
+    var mapa = {};
+    jugadores.forEach(function (j) { mapa[j.id] = j.name; });
+
+    escribirTabla_(&#x27;Jugadores&#x27;, jugadores.map(function (j) {
+      // Conservamos la fecha de alta original si ya estaba en la hoja.
+      return { id: j.id, nombre: j.name, creadoEn: j.creadoEn || fecha_(Date.now()) };
+    }));
+
+    escribirTabla_(&#x27;Torneos&#x27;, torneos.map(function (t) {
+      return {
+        id: t.id,
+        nombre: t.name,
+        estado: t.status,
+        puntosPorJuego: t.pointsPerGame,
+        juegosParaGanar: t.setsToWin,
+        numJornadas: t.numJornadas,
+        jugadoresIds: (t.playerIds || []).join(&#x27;,&#x27;),
+        jugadoresNombres: nombresDe_(t.playerIds, mapa).split(&#x27; + &#x27;).join(&#x27;, &#x27;),
+        campeonId: t.champion || &#x27;&#x27;,
+        creadoEn: fecha_(t.createdAt),
+        finalizadoEn: fecha_(t.finishedAt)
+      };
+    }));
+
+    var filasPartidos = [];
+    torneos.forEach(function (t) {
+      (t.matches || []).forEach(function (m) {
+        filasPartidos.push({
+          id: m.id,
+          torneoId: t.id,
+          torneoNombre: t.name,
+          jornada: m.jornada,
+          jugadorA: mapa[m.a] || m.a,
+          jugadorB: mapa[m.b] || m.b,
+          jugadorAId: m.a,
+          jugadorBId: m.b,
+          ganador: m.winner ? (mapa[m.winner] || m.winner) : &#x27;&#x27;,
+          ganadorId: m.winner || &#x27;&#x27;,
+          resultado: m.scoreLabel || &#x27;&#x27;,
+          parciales: parcialesTexto_(m.sets),
+          jugadoEn: m.winner ? fecha_(t.finishedAt || Date.now()) : &#x27;&#x27;
+        });
+      });
+    });
+    escribirTabla_(&#x27;Partidos&#x27;, filasPartidos);
+
+    escribirTabla_(&#x27;PartidosSueltos&#x27;, sueltos.map(function (p) {
+      return {
+        id: p.id,
+        modo: p.modo,
+        equipoA: nombresDe_(p.equipoA, mapa),
+        equipoB: nombresDe_(p.equipoB, mapa),
+        equipoAIds: (p.equipoA || []).join(&#x27;,&#x27;),
+        equipoBIds: (p.equipoB || []).join(&#x27;,&#x27;),
+        puntosPorJuego: p.pointsPerGame,
+        ganador: p.ganador === &#x27;A&#x27; ? nombresDe_(p.equipoA, mapa) : nombresDe_(p.equipoB, mapa),
+        ganadorLado: p.ganador,
+        resultado: p.scoreLabel,
+        parciales: parcialesTexto_(p.games),
+        jugadoEn: fecha_(p.playedAt)
+      };
+    }));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------ FOTOS ------------------------------ */
+
+function carpetaFotos_() {
+  var it = DriveApp.getFoldersByName(CARPETA_FOTOS);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(CARPETA_FOTOS);
+}
+
+/**
+ * Recibe la foto en base64, la sube a Drive y devuelve un enlace directo.
+ * En la hoja sólo se guarda el enlace: una celda no puede contener la imagen.
+ */
+function subirFoto_(body) {
+  var base64 = String(body.dataUrl || &#x27;&#x27;).replace(/^data:image\/\w+;base64,/, &#x27;&#x27;);
+  var bytes = Utilities.base64Decode(base64);
+  var blob = Utilities.newBlob(bytes, &#x27;image/jpeg&#x27;, (body.nombre || &#x27;foto&#x27;) + &#x27;.jpg&#x27;);
+
+  var archivo = carpetaFotos_().createFile(blob);
+  archivo.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var url = &#x27;https://drive.google.com/thumbnail?id=&#x27; + archivo.getId() + &#x27;&amp;sz=w1600&#x27;;
+  var id = &#x27;f_&#x27; + archivo.getId();
+
+  hoja_(&#x27;Fotos&#x27;).appendRow([
+    id,
+    String(body.registroId || &#x27;&#x27;),
+    String(body.tipo || &#x27;&#x27;),
+    String(body.descripcion || &#x27;&#x27;),
+    url,
+    fecha_(Date.now())
+  ]);
+
+  return { id: id, dataUrl: url, addedAt: Date.now() };
+}
+</pre>
+    </details>
+  </div>
+
+  <div class="paso">
+    <h2><span class="num">3</span> Publicar y darme el enlace</h2>
+    <p>Arriba a la derecha: <span class="campo">Implementar</span> &rarr; <span class="campo">Nueva implementación</span> &rarr; icono ⚙️ &rarr; <span class="campo">Aplicación web</span>. Rellena así:</p>
+    <ul>
+      <li><strong>Ejecutar como:</strong> <span class="campo">Yo</span></li>
+      <li><strong>Quién tiene acceso:</strong> <span class="campo">Cualquier usuario</span></li>
+    </ul>
+    <div class="aviso rojo">⚠️ Si dejas «Solo yo» en el segundo campo, las tablets y los móviles <strong>no podrán guardar</strong> los resultados. Tiene que ser «Cualquier usuario».</div>
+    <p>Pulsa <span class="campo">Implementar</span>. Google te pedirá autorizar: dirá que la app «no está verificada» — es normal, la has hecho tú. Pulsa <span class="campo">Configuración avanzada</span> &rarr; <span class="campo">Ir a Pit Pong DB (no seguro)</span> &rarr; <span class="campo">Permitir</span>.</p>
+    <div class="aviso">Al final te dará una <strong>URL de la aplicación web</strong> que acaba en <code>/exec</code>. Cópiala y pásamela por el chat: yo la meto en la app y publico.</div>
+  </div>
+
+  <footer>Pit Pong · CSC Green Pit Stop · colores del cartel oficial</footer>
+</div>
+
+<script>
+(function(){
+  var btn = document.getElementById('btn-copiar');
+  var estado = document.getElementById('estado');
+  var pre = document.getElementById('codigo');
+
+  function feedback(ok, msg){
+    estado.textContent = msg;
+    estado.className = 'estado-copia' + (ok ? '' : ' error');
+    btn.classList.remove('copiado','fallo');
+    btn.classList.add(ok ? 'copiado' : 'fallo');
+    btn.textContent = ok ? '✓ Copiado — ya puedes pegarlo' : '📋 Copiar el código';
+    if(ok){
+      setTimeout(function(){
+        btn.classList.remove('copiado');
+        btn.textContent = '📋 Copiar el código';
+      }, 4000);
+    }
+  }
+
+  // Esta página se abre como archivo local (file://), y ahí la API moderna
+  // del portapapeles no funciona y falla sin avisar. Por eso se usa el
+  // método clásico con un textarea temporal.
+  function copiarClasico(texto){
+    var ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.setAttribute('readonly','');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, texto.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch(e){ ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  btn.addEventListener('click', function(){
+    var texto = pre.textContent;
+    if(copiarClasico(texto)){
+      feedback(true, 'Código copiado. Pégalo en Apps Script con ⌘V.');
+      return;
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto).then(function(){
+        feedback(true, 'Código copiado. Pégalo en Apps Script con ⌘V.');
+      }).catch(function(){
+        feedback(false, 'No se pudo copiar solo. Abre «Ver el código», selecciona todo con ⌘A y copia con ⌘C.');
+      });
+    } else {
+      feedback(false, 'No se pudo copiar solo. Abre «Ver el código», selecciona todo con ⌘A y copia con ⌘C.');
+    }
+  });
+})();
+</script>
+</body>
+</html>

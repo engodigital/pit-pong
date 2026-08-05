@@ -460,6 +460,44 @@
     text-align:center;padding:20px;color:var(--madera-oscura);font-size:.75rem;opacity:.7;
   }
 
+  /* ---------- Pantalla completa: el marcador se vuelve un tanteador ---------- */
+  body.pantalla-completa #view-scorer main{
+    max-width:100%;
+    padding:8px 14px 12px;
+    min-height:calc(100vh - 66px);
+    min-height:calc(100dvh - 66px);
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  body.pantalla-completa #scorer-titulo{display:none;}
+  body.pantalla-completa .scorer-jugadores{flex:1 1 auto;min-height:0;gap:14px;}
+  body.pantalla-completa .score-panel{
+    height:100%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:10px;
+  }
+  body.pantalla-completa .score-panel .nombre{
+    font-size:clamp(1rem, 4vh, 2.4rem);
+    min-height:auto;margin-bottom:.2em;
+  }
+  body.pantalla-completa .score-panel .puntos{
+    font-size:clamp(4rem, 30vh, 22rem);
+    line-height:.95;margin:0;
+  }
+  body.pantalla-completa .score-panel .sirve-tag{
+    font-size:clamp(.7rem, 2vh, 1.1rem);padding:3px 14px;margin-top:.4em;
+  }
+  body.pantalla-completa .sets-info{
+    font-size:clamp(.8rem, 2.2vh, 1.3rem);margin:0;
+  }
+  body.pantalla-completa .regla-saque{font-size:clamp(.65rem, 1.7vh, 1rem);margin:0;}
+  body.pantalla-completa .juegos-log{margin:0;}
+  body.pantalla-completa .voice-box{padding:6px;margin-top:0;}
+  body.pantalla-completa .voice-estado{font-size:.7rem;margin-top:3px;}
+  body.pantalla-completa .scorer-acciones{margin-top:0;}
+  body.pantalla-completa .scorer-acciones .btn{min-height:38px;padding:8px 14px;font-size:.8rem;}
+
   /* ---------- Tablet en horizontal: aprovechar el ancho ---------- */
   @media (orientation:landscape) and (min-height:521px){
     .scorer-jugadores{gap:20px;}
@@ -692,6 +730,7 @@
 
     <div class="scorer-acciones">
       <button class="btn ghost" id="btn-deshacer">↩️ Deshacer último punto</button>
+      <button class="btn madera" id="btn-cambiar-campo">🔄 Cambiar de campo</button>
       <button class="btn rojo" id="btn-cancelar-partido">Cancelar partido</button>
     </div>
     <div id="scorer-ganador" class="oculto" style="margin-top:20px;"></div>
@@ -1463,7 +1502,8 @@
       setsToWin: t.setsToWin,
       pointsLog: [],
       games: [],
-      startServer: "a"
+      startServer: "a",
+      ladosCambiados: false
     };
     prepararUIScorer();
   }
@@ -1477,7 +1517,8 @@
       setsToWin: 1,
       pointsLog: [],
       games: [],
-      startServer: "a"
+      startServer: "a",
+      ladosCambiados: false
     };
     prepararUIScorer();
   }
@@ -1588,19 +1629,28 @@
     return (Math.floor(total/3) % 2 === 0) ? scorerState.startServer : other;
   }
 
+  // Cambio de campo: sólo afecta a qué panel se pinta cada jugador. Los
+  // datos (puntos, juegos, saque) siguen siendo siempre "a" y "b", así el
+  // marcador no se puede corromper al cambiar de lado.
+  function ladoIzq(){ return scorerState.ladosCambiados ? "b" : "a"; }
+  function ladoDer(){ return scorerState.ladosCambiados ? "a" : "b"; }
+
   function renderScorer(){
-    const {a,b} = currentGameScore();
-    document.getElementById("puntos-a").textContent = a;
-    document.getElementById("puntos-b").textContent = b;
+    const puntos = currentGameScore();
+    const izq = ladoIzq(), der = ladoDer();
+    document.getElementById("nombre-a").textContent = scorerState[izq].label;
+    document.getElementById("nombre-b").textContent = scorerState[der].label;
+    document.getElementById("puntos-a").textContent = puntos[izq];
+    document.getElementById("puntos-b").textContent = puntos[der];
     const server = currentServer();
-    document.getElementById("sirve-a").classList.toggle("oculto", server!=="a");
-    document.getElementById("sirve-b").classList.toggle("oculto", server!=="b");
-    document.getElementById("panel-a").classList.toggle("sirve", server==="a");
-    document.getElementById("panel-b").classList.toggle("sirve", server==="b");
+    document.getElementById("sirve-a").classList.toggle("oculto", server!==izq);
+    document.getElementById("sirve-b").classList.toggle("oculto", server!==der);
+    document.getElementById("panel-a").classList.toggle("sirve", server===izq);
+    document.getElementById("panel-b").classList.toggle("sirve", server===der);
 
     const sw = setsWonCount();
     document.getElementById("sets-marcador").textContent =
-      "Juegos: " + sw.a + " - " + sw.b + " (a " + scorerState.setsToWin + " juegos ganados)";
+      "Juegos: " + sw[izq] + " - " + sw[der] + " (a " + scorerState.setsToWin + " juegos ganados)";
 
     const aviso = document.getElementById("regla-saque");
     if(enFaseVentaja()){
@@ -1616,7 +1666,7 @@
     scorerState.games.forEach((g,i)=>{
       const chip = document.createElement("div");
       chip.className = "juego-chip";
-      chip.textContent = "J"+(i+1)+": "+g.a+"-"+g.b;
+      chip.textContent = "J"+(i+1)+": "+g[izq]+"-"+g[der];
       log.appendChild(chip);
     });
   }
@@ -1760,8 +1810,15 @@
     voiceEstadoTexto("Di el nombre del jugador para sumarle el punto — necesita micrófono y conexión a internet.");
   }
 
-  document.getElementById("panel-a").addEventListener("click", ()=>marcarPunto("a"));
-  document.getElementById("panel-b").addEventListener("click", ()=>marcarPunto("b"));
+  // El punto va a quien se muestra en ese panel, no al lado "a"/"b" fijo.
+  document.getElementById("panel-a").addEventListener("click", ()=>{ if(scorerState) marcarPunto(ladoIzq()); });
+  document.getElementById("panel-b").addEventListener("click", ()=>{ if(scorerState) marcarPunto(ladoDer()); });
+  document.getElementById("btn-cambiar-campo").addEventListener("click", ()=>{
+    if(!scorerState) return;
+    scorerState.ladosCambiados = !scorerState.ladosCambiados;
+    renderScorer();
+    if(navigator.vibrate) navigator.vibrate(40);
+  });
   document.getElementById("btn-deshacer").addEventListener("click", ()=>{
     if(!scorerState) return;
     if(scorerState.pointsLog.length>0){
@@ -2078,6 +2135,9 @@
   }
   function renderBotonesPantallaCompleta(){
     const activa = enPantallaCompleta();
+    // En pantalla completa el marcador pasa a modo "tanteador": números
+    // enormes para verlos desde la mesa.
+    document.body.classList.toggle("pantalla-completa", activa);
     document.querySelectorAll(".btn-fullscreen").forEach(btn=>{
       const enBarra = btn.closest("#topbar");
       btn.innerHTML = (activa ? SVG_CONTRAER : SVG_EXPANDIR) +

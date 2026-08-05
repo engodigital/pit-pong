@@ -19,11 +19,23 @@
 var SHEET_ID = '1jyQZHeDxSvT0xkJ5Rlcg86d3a7uW8QjQ08ym8h7NVGU';
 var CARPETA_FOTOS = 'Pit Pong - Fotos';
 
-function ss_() { return SpreadsheetApp.openById(SHEET_ID); }
+/**
+ * openById y getSheetByName son llamadas caras: sin caché, un guardado con
+ * 36 partidos tardaba ~60 segundos. Guardándolas baja a pocos segundos.
+ */
+var _ss = null;
+var _hojas = {};
+
+function ss_() {
+  if (!_ss) _ss = SpreadsheetApp.openById(SHEET_ID);
+  return _ss;
+}
 
 function hoja_(nombre) {
+  if (_hojas[nombre]) return _hojas[nombre];
   var h = ss_().getSheetByName(nombre);
   if (!h) throw new Error('Falta la hoja "' + nombre + '" en Pit Pong DB');
+  _hojas[nombre] = h;
   return h;
 }
 
@@ -48,14 +60,21 @@ function leerTabla_(nombre) {
   return filas;
 }
 
-/** Sustituye todo el contenido de una hoja (menos la cabecera). */
+/**
+ * Sustituye todo el contenido de una hoja (menos la cabecera).
+ * Se escribe de una sola vez (un setValues) en lugar de fila a fila.
+ */
 function escribirTabla_(nombre, filas) {
   var h = hoja_(nombre);
-  var cab = h.getRange(1, 1, 1, h.getLastColumn()).getValues()[0];
-  if (h.getLastRow() > 1) {
-    h.getRange(2, 1, h.getLastRow() - 1, h.getLastColumn()).clearContent();
+  var ultimaFila = h.getLastRow();
+  var ultimaCol = h.getLastColumn();
+  var cab = h.getRange(1, 1, 1, ultimaCol).getValues()[0];
+
+  if (ultimaFila > 1) {
+    h.getRange(2, 1, ultimaFila - 1, ultimaCol).clearContent();
   }
   if (!filas.length) return;
+
   var matriz = filas.map(function (f) {
     return cab.map(function (col) {
       var v = f[col];
@@ -106,8 +125,9 @@ function doPost(e) {
     var accion = body.accion;
 
     if (accion === 'guardar') {
-      guardarTodo_(body.datos);
-      return json_({ ok: true, datos: cargarTodo_() });
+      // guardarTodo_ ya devuelve el estado fusionado: releer la hoja otra vez
+      // sólo para responder duplicaba el tiempo de guardado.
+      return json_({ ok: true, datos: guardarTodo_(body.datos) });
     }
     if (accion === 'cargar') {
       return json_({ ok: true, datos: cargarTodo_() });
@@ -283,6 +303,10 @@ function guardarTodo_(datos) {
         jugadoEn: fecha_(p.playedAt)
       };
     }));
+
+    // Devolvemos el estado ya fusionado (las fotos siguen viviendo en su
+    // hoja, así que se conservan tal cual venían de cargarTodo_).
+    return { jugadores: jugadores, torneos: torneos, partidosSueltos: sueltos };
   } finally {
     lock.releaseLock();
   }

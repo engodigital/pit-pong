@@ -87,12 +87,30 @@
 
   /* ---------- HOME ---------- */
   #view-home main{max-width:1100px;}
+  /* Controles del inicio, arriba a la derecha */
+  .home-controles{
+    display:flex;justify-content:flex-end;gap:8px;
+    padding:2px 0 6px;
+  }
+  .icon-btn-home{
+    width:46px;height:46px;flex-shrink:0;
+    border-radius:12px;
+    border:2px solid var(--madera);
+    background:#fff8ec;
+    color:var(--madera-oscura);
+    font-size:20px;font-weight:800;
+    cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(26,17,8,.2);
+  }
+  .icon-btn-home:active{background:var(--dorado);}
+
   .home-wrap{
     display:flex;
     flex-direction:column;
     align-items:center;
-    gap:26px;
-    padding:28px 12px 10px;
+    gap:20px;
+    padding:10px 12px 10px;
     width:100%;
     max-width:100%;
   }
@@ -142,7 +160,7 @@
     grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     gap:16px;
     width:100%;
-    max-width:560px;
+    max-width:680px;
     min-width:0;
   }
   .corner-btn{
@@ -161,7 +179,9 @@
     font-size:.95rem;
     text-transform:uppercase;
     letter-spacing:.3px;
-    min-height:110px;
+    /* Botones grandes: se usan de pie, junto a la mesa */
+    min-height:clamp(120px, 20vh, 190px);
+    font-size:clamp(.95rem, 2.2vh, 1.25rem);
     min-width:0;
     width:100%;
     text-align:center;
@@ -169,7 +189,7 @@
     transition:transform .12s ease;
   }
   .corner-btn:active{transform:scale(.96);}
-  .corner-btn .emoji{font-size:2rem;}
+  .corner-btn .emoji{font-size:clamp(2rem, 5vh, 3.2rem);}
   .corner-btn.b-verde{background:linear-gradient(160deg,var(--verde),var(--verde-oscuro));}
   .corner-btn.b-madera{background:linear-gradient(160deg,var(--madera),var(--madera-oscura));}
   .corner-btn.b-azul{background:linear-gradient(160deg,var(--azul),#1d4f66);}
@@ -192,7 +212,7 @@
     }
     .home-header{grid-area:header;}
     .corner-grid{display:contents;}
-    .corner-btn{width:220px;}
+    .corner-btn{width:clamp(220px, 24vw, 320px);}
     #btn-jugadores{grid-area:tl;align-self:start;justify-self:start;}
     #btn-crear{grid-area:tr;align-self:start;justify-self:end;}
     #btn-continuar{grid-area:bl;align-self:end;justify-self:start;}
@@ -719,6 +739,11 @@
 <!-- ===================== HOME ===================== -->
 <section id="view-home" class="view">
   <main>
+    <div class="home-controles">
+      <button class="icon-btn-home btn-reglas" title="Reglas del juego">?</button>
+      <button class="icon-btn-home" id="btn-recargar-online" title="Actualizar datos">🔄</button>
+      <button class="icon-btn-home btn-fullscreen" title="Pantalla completa"></button>
+    </div>
     <div class="home-wrap">
       <div class="home-header">
         <div class="logo-badge"><img id="logo-img" src="" alt="Logo Pit Pong"></div>
@@ -736,11 +761,6 @@
     </div>
     <footer class="app-footer">
       <div class="sync-estado" id="sync-estado"></div>
-      <div style="margin-bottom:12px;">
-        <button class="btn azul btn-fullscreen" style="padding:11px 22px;"></button>
-        <button class="btn madera btn-reglas" style="padding:11px 22px;">📋 Reglas del juego</button>
-        <button class="btn ghost" id="btn-recargar-online" style="padding:11px 22px;">🔄 Actualizar datos</button>
-      </div>
       <div id="fullscreen-ayuda" class="oculto" style="max-width:420px;margin:0 auto 12px;font-size:.75rem;line-height:1.5;">
         En el iPad, Safari no permite pantalla completa desde la web.
         Para verla sin barras: pulsa <strong>Compartir</strong> → <strong>Añadir a pantalla de inicio</strong>,
@@ -2645,9 +2665,10 @@
     // enormes para verlos desde la mesa.
     document.body.classList.toggle("pantalla-completa", activa);
     document.querySelectorAll(".btn-fullscreen").forEach(btn=>{
-      const enBarra = btn.closest("#topbar");
+      // Los botones redondos van sólo con el icono; si no, el texto se sale.
+      const soloIcono = btn.classList.contains("icon-btn") || btn.classList.contains("icon-btn-home");
       btn.innerHTML = (activa ? SVG_CONTRAER : SVG_EXPANDIR) +
-        (enBarra ? "" : "<span>"+(activa ? "Salir de pantalla completa" : "Pantalla completa")+"</span>");
+        (soloIcono ? "" : "<span>"+(activa ? "Salir de pantalla completa" : "Pantalla completa")+"</span>");
       btn.title = activa ? "Salir de pantalla completa" : "Pantalla completa";
     });
   }

@@ -345,6 +345,15 @@
     text-align:center;margin:14px 0;font-weight:800;color:var(--madera-oscura);
     text-transform:uppercase;letter-spacing:.5px;
   }
+  .regla-saque{
+    text-align:center;font-size:.75rem;font-weight:700;color:var(--madera-oscura);
+    opacity:.75;margin:-6px 0 6px;
+  }
+  .regla-saque.activo{
+    opacity:1;color:var(--tinta);background:var(--dorado);
+    display:inline-block;padding:3px 12px;border-radius:20px;
+    left:50%;position:relative;transform:translateX(-50%);
+  }
   .juegos-log{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0;}
   .juego-chip{
     background:#fff8ec;border:1px solid var(--madera);border-radius:8px;
@@ -670,6 +679,7 @@
       </div>
     </div>
     <div class="sets-info" id="sets-marcador"></div>
+    <div class="regla-saque" id="regla-saque"></div>
     <div class="juegos-log" id="juegos-log"></div>
 
     <div class="voice-box" id="voice-box">
@@ -1552,15 +1562,30 @@
     scorerState.games.forEach(g=>{ if(g.a>g.b) a++; else b++; });
     return {a,b};
   }
+  // Umbral de la fase final: 10 en partidos a 11, 20 en partidos a 21.
+  function umbralVentaja(){ return scorerState.pointsPerGame - 1; }
+
+  function enFaseVentaja(){
+    const {a,b} = currentGameScore();
+    return a >= umbralVentaja() || b >= umbralVentaja();
+  }
+
   function currentServer(){
     const {a,b} = currentGameScore();
     const total = a+b;
-    const deuce = scorerState.pointsPerGame - 1;
     const other = scorerState.startServer === "a" ? "b" : "a";
-    if(a>=deuce && b>=deuce){
+
+    // Fase final: en cuanto uno llega al umbral, saca SIEMPRE quien va por
+    // detrás (ventaja para el que pierde) hasta el final del juego.
+    // Si están empatados no hay nadie por detrás: se alterna cada punto.
+    if(enFaseVentaja()){
+      if(a < b) return "a";
+      if(b < a) return "b";
       return (total % 2 === 0) ? scorerState.startServer : other;
     }
-    return (Math.floor(total/2) % 2 === 0) ? scorerState.startServer : other;
+
+    // Fase normal: el saque cambia cada 3 puntos.
+    return (Math.floor(total/3) % 2 === 0) ? scorerState.startServer : other;
   }
 
   function renderScorer(){
@@ -1576,6 +1601,15 @@
     const sw = setsWonCount();
     document.getElementById("sets-marcador").textContent =
       "Juegos: " + sw.a + " - " + sw.b + " (a " + scorerState.setsToWin + " juegos ganados)";
+
+    const aviso = document.getElementById("regla-saque");
+    if(enFaseVentaja()){
+      aviso.textContent = "⚡ Ventaja: saca siempre quien va por detrás";
+      aviso.classList.add("activo");
+    } else {
+      aviso.textContent = "Saque cada 3 puntos · desde " + umbralVentaja() + " saca quien va por detrás";
+      aviso.classList.remove("activo");
+    }
 
     const log = document.getElementById("juegos-log");
     log.innerHTML = "";
@@ -1739,9 +1773,20 @@
     renderScorer();
   });
   document.getElementById("btn-cancelar-partido").addEventListener("click", ()=>{
+    if(!scorerState) return;
     if(confirm("¿Cancelar este partido? No se guardará ningún resultado.")){
+      // Una partida suelta no pertenece a ningún torneo: volver al cuadro
+      // rompería (currentBracketId puede estar vacío o ser de otro torneo).
+      const eraTorneo = scorerState.tipo === "torneo";
+      const t = eraTorneo ? getTournament(scorerState.tournamentId) : null;
       scorerState = null;
-      showView("bracket", {titulo: getTournament(currentBracketId).name});
+      cerrarSorteoMoneda();
+      if(t){
+        currentBracketId = t.id;
+        showView("bracket", {titulo: t.name});
+      } else {
+        showView("home");
+      }
     }
   });
 

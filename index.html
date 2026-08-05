@@ -246,6 +246,7 @@
   .btn.madera{background:var(--madera);}
   .btn.azul{background:var(--azul);}
   .btn.dorado{background:var(--dorado);color:var(--tinta);}
+  .btn.verde-claro{background:var(--verde);}
   .btn.ghost{background:transparent;border:2px solid var(--madera);color:var(--madera-oscura);}
   .btn[disabled]{opacity:.4;cursor:not-allowed;}
   .btn.small{padding:7px 12px;min-height:36px;font-size:.85rem;}
@@ -750,7 +751,10 @@
         <h1 class="home-title">Pit Pong</h1>
         <div class="home-subtitle">Plataforma de Torneos</div>
         <div class="home-stats" id="home-stats"></div>
-        <button class="btn dorado" id="btn-jugar-rapido" style="margin-top:6px;font-size:1rem;padding:12px 28px;">🏓 Jugar partido</button>
+        <div class="fila" style="justify-content:center;margin-top:6px;">
+          <button class="btn dorado" id="btn-jugar-rapido" style="font-size:1rem;padding:12px 24px;">🏓 Jugar partido</button>
+          <button class="btn verde-claro" id="btn-ligas" style="font-size:1rem;padding:12px 24px;">🏅 Ligas</button>
+        </div>
       </div>
       <div class="corner-grid">
         <button class="corner-btn b-verde" id="btn-jugadores"><span class="emoji">🧑‍🤝‍🧑</span>Añadir jugadores</button>
@@ -861,6 +865,100 @@
     </div>
     <div class="vacio oculto" id="jugar-rapido-vacio">Añade al menos 2 jugadores para poder jugar.</div>
     <button class="btn dorado" id="btn-empezar-rapido" style="width:100%;font-size:1.05rem;">🏓 Empezar partido</button>
+  </main>
+</section>
+
+<!-- ===================== LIGAS (clasificación permanente) ===================== -->
+<section id="view-ligas" class="view oculto">
+  <main>
+    <button class="btn dorado" id="btn-nueva-liga" style="width:100%;font-size:1.05rem;margin-bottom:14px;">➕ Crear una liga nueva</button>
+    <div class="filtros" id="filtros-ligas">
+      <input type="text" class="buscador" id="buscar-liga" placeholder="🔍 Buscar liga o jugador…">
+    </div>
+    <div id="lista-ligas"></div>
+    <div class="vacio oculto" id="ligas-vacio">
+      Todavía no hay ninguna liga.<br><br>
+      Una liga es una <strong>clasificación permanente</strong>: no tiene calendario,
+      juegas cuando queráis y cada partido suma a la tabla.
+    </div>
+    <div class="vacio oculto" id="ligas-sin-resultados">Ninguna liga coincide con la búsqueda.</div>
+  </main>
+</section>
+
+<!-- ===================== CREAR LIGA ===================== -->
+<section id="view-crear-liga" class="view oculto">
+  <main>
+    <div class="card">
+      <h3>Nueva liga</h3>
+      <label>Nombre de la liga</label>
+      <input type="text" id="input-nombre-liga" placeholder="Ej. Liga del Club" maxlength="40">
+      <div class="fila">
+        <div style="flex:1;min-width:140px;">
+          <label>Puntos por juego</label>
+          <div class="fila toggle-grupo" id="toggle-puntos-liga">
+            <button class="btn toggle-opcion activo" data-puntos="11" style="flex:1;">11</button>
+            <button class="btn toggle-opcion" data-puntos="21" style="flex:1;">21</button>
+          </div>
+        </div>
+        <div style="flex:1;min-width:140px;">
+          <label>Formato del partido</label>
+          <select id="input-sets-liga" style="width:100%;padding:11px 12px;border-radius:8px;border:2px solid var(--madera);min-height:44px;font-size:1rem;">
+            <option value="1">Juego único</option>
+            <option value="2" selected>Mejor de 3</option>
+            <option value="3">Mejor de 5</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>¿Quién juega en esta liga?</h3>
+      <div class="check-item check-todos" id="check-todos-liga-wrap">
+        <span class="caja-check" id="caja-todos-liga"></span>
+        <span style="font-weight:800;">Seleccionar todos los jugadores</span>
+      </div>
+      <div class="checklist" id="checklist-liga"></div>
+      <div class="vacio oculto" id="checklist-liga-vacio">No hay jugadores todavía — añádelos primero.</div>
+      <div class="home-stats" id="seleccion-liga-info" style="margin-top:10px;"></div>
+    </div>
+    <button class="btn dorado" id="btn-generar-liga" style="width:100%;font-size:1.05rem;">🏅 Crear liga</button>
+  </main>
+</section>
+
+<!-- ===================== DETALLE DE LIGA ===================== -->
+<section id="view-liga" class="view oculto">
+  <main>
+    <div class="card" id="liga-info-card"></div>
+    <button class="btn dorado" id="btn-anadir-partido-liga" style="width:100%;font-size:1.05rem;margin-bottom:14px;">➕ Añadir partido</button>
+    <div class="card">
+      <h3>Partidos jugados</h3>
+      <div id="liga-partidos"></div>
+      <div class="vacio oculto" id="liga-sin-partidos">Todavía no se ha jugado ningún partido en esta liga.</div>
+    </div>
+    <div class="fila" style="justify-content:center;">
+      <button class="btn azul" id="btn-fotos-liga">📷 Fotos</button>
+      <button class="btn rojo" id="btn-eliminar-liga">🗑️ Eliminar liga</button>
+    </div>
+  </main>
+</section>
+
+<!-- ===================== ELEGIR RIVALES EN LA LIGA ===================== -->
+<section id="view-liga-partido" class="view oculto">
+  <main>
+    <div class="card">
+      <h3 id="liga-partido-titulo">Elige a los dos jugadores</h3>
+      <div class="home-stats">El resultado contará para la clasificación de esta liga.</div>
+    </div>
+    <div class="fila" style="align-items:stretch;">
+      <div class="card" style="flex:1;min-width:150px;">
+        <h3>Jugador 1</h3>
+        <div class="checklist" id="checklist-liga-a"></div>
+      </div>
+      <div class="card" style="flex:1;min-width:150px;">
+        <h3>Jugador 2</h3>
+        <div class="checklist" id="checklist-liga-b"></div>
+      </div>
+    </div>
+    <button class="btn dorado" id="btn-empezar-liga-partido" style="width:100%;font-size:1.05rem;">🏓 Empezar partido</button>
   </main>
 </section>
 
@@ -1290,6 +1388,10 @@
     if(name==="scorer") return "Marcador";
     if(name==="detalle-historial"){ const reg=getRegistroHistorial(currentHistorialId); return reg ? nombreRegistroHistorial(reg) : null; }
     if(name==="jugar-rapido") return "Jugar partido";
+    if(name==="ligas") return "Ligas";
+    if(name==="crear-liga") return "Nueva liga";
+    if(name==="liga"){ const l=getLiga(currentLigaId); return l ? l.name : "Liga"; }
+    if(name==="liga-partido") return "Nuevo partido";
     return null;
   }
 
@@ -1334,6 +1436,16 @@
       } else { showView("historial"); return; }
     }
     if(name === "jugar-rapido") renderJugarRapido();
+    if(name === "ligas") renderLigas();
+    if(name === "crear-liga") renderCrearLiga();
+    if(name === "liga"){
+      if(currentLigaId && getLiga(currentLigaId)) renderLigaDetalle();
+      else { showView("ligas"); return; }
+    }
+    if(name === "liga-partido"){
+      if(currentLigaId && getLiga(currentLigaId)) renderLigaPartido();
+      else { showView("ligas"); return; }
+    }
   }
 
   document.getElementById("btn-volver").addEventListener("click", ()=>{
@@ -1809,7 +1921,7 @@
     const sinRes = document.getElementById("continuar-sin-resultados");
     const texto = document.getElementById("buscar-continuar").value.trim();
     const orden = document.getElementById("orden-continuar").value;
-    const todosActivos = tournaments.filter(t=>t.status==="activo");
+    const todosActivos = tournaments.filter(t=>t.status==="activo" && !esLiga(t));
     let activos = todosActivos.filter(t=>coincideTorneo(t, texto));
     activos.sort((x,y)=>{
       if(orden==="antiguo") return (x.createdAt||0) - (y.createdAt||0);
@@ -2089,6 +2201,237 @@
     renderScorer();
     mostrarSorteoMoneda();
   }
+
+  /* ===================== LIGAS (clasificación permanente) =====================
+     Una liga es como una liguilla pero SIN calendario: no hay jornadas ni
+     final, se añaden partidos cuando se juegan y la tabla se actualiza. */
+  let currentLigaId = null;
+  let ligaSelA = [];
+  let ligaSelB = [];
+  let puntosLiga = 11;
+  let seleccionLiga = new Set();
+
+  function esLiga(t){ return t && t.format === "liga"; }
+  function getLigas(){ return tournaments.filter(esLiga); }
+  function getLiga(id){ const t = getTournament(id); return esLiga(t) ? t : null; }
+
+  document.getElementById("btn-ligas").addEventListener("click", ()=>showView("ligas", {titulo:"Ligas"}));
+  document.getElementById("btn-nueva-liga").addEventListener("click", ()=>showView("crear-liga", {titulo:"Nueva liga"}));
+
+  function renderLigas(){
+    const cont = document.getElementById("lista-ligas");
+    const vacio = document.getElementById("ligas-vacio");
+    const sinRes = document.getElementById("ligas-sin-resultados");
+    const texto = document.getElementById("buscar-liga").value.trim();
+    const todas = getLigas();
+    const ligas = todas.filter(l=>coincideTorneo(l, texto))
+                       .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    document.getElementById("filtros-ligas").classList.toggle("oculto", todas.length===0);
+    vacio.classList.toggle("oculto", todas.length>0);
+    sinRes.classList.toggle("oculto", !(todas.length>0 && ligas.length===0));
+    cont.innerHTML = "";
+    ligas.forEach(l=>{
+      const jugados = (l.matches||[]).filter(m=>m.winner).length;
+      const tabla = calcularClasificacion(l);
+      const lider = tabla.length && tabla[0].pj>0 ? tabla[0] : null;
+      const div = document.createElement("div");
+      div.className = "card hist-card";
+      div.innerHTML =
+        '<h3>'+escapeHtml(l.name)+'</h3>'+
+        '<div class="home-stats">'+l.playerIds.length+' jugadores · '+jugados+' partido(s) jugado(s)</div>'+
+        (lider ? '<div class="campeon-tag">🥇 Va primero: '+escapeHtml(playerName(lider.id))+' ('+lider.pg+' ganados)</div>'
+               : '<div class="home-stats">Todavía sin partidos</div>');
+      div.addEventListener("click", ()=>{
+        currentLigaId = l.id;
+        showView("liga", {titulo: l.name});
+      });
+      cont.appendChild(div);
+    });
+  }
+
+  /* ---- crear liga ---- */
+  function renderCrearLiga(){
+    seleccionLiga = new Set();
+    puntosLiga = 11;
+    document.getElementById("input-nombre-liga").value = "";
+    document.getElementById("input-sets-liga").value = "2";
+    document.querySelectorAll("#toggle-puntos-liga .toggle-opcion")
+      .forEach(b=>b.classList.toggle("activo", b.dataset.puntos==="11"));
+    renderChecklistLiga();
+  }
+
+  function renderChecklistLiga(){
+    const cont = document.getElementById("checklist-liga");
+    document.getElementById("checklist-liga-vacio").classList.toggle("oculto", players.length>0);
+    cont.innerHTML = "";
+    players.forEach(p=>{
+      const marcado = seleccionLiga.has(p.id);
+      const item = document.createElement("div");
+      item.className = "check-item" + (marcado?" marcado":"");
+      item.innerHTML =
+        '<span class="caja-check'+(marcado?" activa":"")+'">'+(marcado?"✓":"")+'</span>'+
+        avatarHtml(p.id, 30)+'<span>'+escapeHtml(p.name)+'</span>';
+      item.addEventListener("click", ()=>{
+        if(seleccionLiga.has(p.id)) seleccionLiga.delete(p.id); else seleccionLiga.add(p.id);
+        renderChecklistLiga();
+      });
+      cont.appendChild(item);
+    });
+    const todos = players.length>0 && seleccionLiga.size===players.length;
+    const caja = document.getElementById("caja-todos-liga");
+    caja.textContent = todos ? "✓" : "";
+    caja.classList.toggle("activa", todos);
+    document.getElementById("check-todos-liga-wrap").classList.toggle("marcado", todos);
+    document.getElementById("seleccion-liga-info").textContent =
+      seleccionLiga.size + " jugador(es) — mínimo 2 para crear la liga.";
+  }
+
+  document.getElementById("check-todos-liga-wrap").addEventListener("click", ()=>{
+    const todos = players.length>0 && seleccionLiga.size===players.length;
+    seleccionLiga = new Set(todos ? [] : players.map(p=>p.id));
+    renderChecklistLiga();
+  });
+  document.querySelectorAll("#toggle-puntos-liga .toggle-opcion").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      puntosLiga = parseInt(btn.dataset.puntos,10);
+      document.querySelectorAll("#toggle-puntos-liga .toggle-opcion")
+        .forEach(b=>b.classList.toggle("activo", b===btn));
+    });
+  });
+
+  document.getElementById("btn-generar-liga").addEventListener("click", ()=>{
+    const ids = Array.from(seleccionLiga);
+    if(ids.length < 2){ alert("Elige al menos 2 jugadores para la liga."); return; }
+    const liga = {
+      id: uid("lg"),
+      name: document.getElementById("input-nombre-liga").value.trim() || "Liga sin nombre",
+      format: "liga",
+      status: "activo",
+      pointsPerGame: puntosLiga,
+      setsToWin: parseInt(document.getElementById("input-sets-liga").value,10),
+      createdAt: Date.now(),
+      finishedAt: null,
+      playerIds: ids,
+      numJornadas: 0,
+      matches: [],
+      champion: null,
+      photos: []
+    };
+    tournaments.push(liga);
+    saveTournaments(tournaments);
+    currentLigaId = liga.id;
+    showView("liga", {titulo: liga.name});
+  });
+
+  /* ---- detalle de liga ---- */
+  function renderLigaDetalle(){
+    const l = getLiga(currentLigaId);
+    if(!l) return;
+    const tabla = calcularClasificacion(l);
+    const jugados = (l.matches||[]).filter(m=>m.winner).length;
+
+    let html =
+      '<h3>'+escapeHtml(l.name)+'</h3>'+
+      '<div class="home-stats">Liga abierta · '+l.playerIds.length+' jugadores · '+
+      'al mejor de '+(l.setsToWin*2-1)+' juego(s) a '+l.pointsPerGame+' puntos</div>'+
+      '<div class="home-stats">'+jugados+' partido(s) jugado(s)</div>'+
+      '<div class="tabla-wrap"><table class="tabla-clasif">'+
+      '<thead><tr><th>#</th><th>Jugador</th><th>PJ</th><th>PG</th><th>PP</th><th>Juegos</th></tr></thead><tbody>';
+    tabla.forEach((f,i)=>{
+      const primero = i===0 && f.pj>0;
+      html += '<tr'+(primero?' class="fila-campeon"':'')+'>'+
+        '<td>'+(primero?'🥇':(i+1))+'</td>'+
+        '<td class="col-nombre">'+escapeHtml(playerName(f.id))+'</td>'+
+        '<td>'+f.pj+'</td><td><strong>'+f.pg+'</strong></td><td>'+f.pp+'</td>'+
+        '<td>'+f.jf+'-'+f.jc+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+    document.getElementById("liga-info-card").innerHTML = html;
+
+    const cont = document.getElementById("liga-partidos");
+    const jugadosLista = (l.matches||[]).filter(m=>m.winner).slice().reverse();
+    document.getElementById("liga-sin-partidos").classList.toggle("oculto", jugadosLista.length>0);
+    cont.innerHTML = "";
+    jugadosLista.forEach(m=>{
+      const div = document.createElement("div");
+      div.className = "jugador-item";
+      div.innerHTML =
+        '<div class="jugador-nombre">'+escapeHtml(playerName(m.a))+' vs '+escapeHtml(playerName(m.b))+'</div>'+
+        '<div class="campeon-tag" style="margin:0;">'+escapeHtml(playerName(m.winner))+' '+escapeHtml(m.scoreLabel||"")+'</div>';
+      cont.appendChild(div);
+    });
+  }
+
+  document.getElementById("btn-eliminar-liga").addEventListener("click", ()=>{
+    const l = getLiga(currentLigaId);
+    if(!l) return;
+    if(confirm('¿Eliminar la liga "'+l.name+'" y todos sus partidos?')){
+      marcarEliminado("torneos", l.id);
+      tournaments = tournaments.filter(t=>t.id!==l.id);
+      saveTournaments(tournaments);
+      showView("ligas", {titulo:"Ligas"});
+    }
+  });
+  document.getElementById("btn-fotos-liga").addEventListener("click", ()=>{
+    currentHistorialId = currentLigaId;
+    showView("detalle-historial", {titulo:"Fotos de la liga"});
+  });
+
+  /* ---- añadir un partido a la liga ---- */
+  document.getElementById("btn-anadir-partido-liga").addEventListener("click", ()=>{
+    ligaSelA = []; ligaSelB = [];
+    showView("liga-partido", {titulo:"Nuevo partido"});
+  });
+
+  function renderLigaPartido(){
+    const l = getLiga(currentLigaId);
+    if(!l) return;
+    document.getElementById("liga-partido-titulo").textContent = l.name;
+    ["a","b"].forEach(lado=>{
+      const cont = document.getElementById("checklist-liga-"+lado);
+      const sel = lado==="a" ? ligaSelA : ligaSelB;
+      const otro = lado==="a" ? ligaSelB : ligaSelA;
+      cont.innerHTML = "";
+      l.playerIds.forEach(id=>{
+        const marcado = sel.includes(id);
+        const enOtro = otro.includes(id);
+        const item = document.createElement("div");
+        item.className = "check-item" + (marcado?" marcado":"") + (enOtro?" deshabilitado":"");
+        item.innerHTML =
+          '<span class="caja-check'+(marcado?" activa":"")+'">'+(marcado?"✓":"")+'</span>'+
+          avatarHtml(id, 30)+'<span>'+escapeHtml(playerName(id))+'</span>';
+        if(!enOtro){
+          item.addEventListener("click", ()=>{
+            const arr = lado==="a" ? ligaSelA : ligaSelB;
+            const i = arr.indexOf(id);
+            if(i>=0) arr.splice(i,1); else { arr.length = 0; arr.push(id); }
+            renderLigaPartido();
+          });
+        }
+        cont.appendChild(item);
+      });
+    });
+  }
+
+  document.getElementById("btn-empezar-liga-partido").addEventListener("click", ()=>{
+    const l = getLiga(currentLigaId);
+    if(!l) return;
+    if(ligaSelA.length!==1 || ligaSelB.length!==1){
+      alert("Elige un jugador en cada lado."); return;
+    }
+    const partido = {
+      id: uid("m"), jornada: 1,
+      a: ligaSelA[0], b: ligaSelB[0],
+      winner: null, sets: [], scoreLabel: ""
+    };
+    l.matches.push(partido);
+    saveTournaments(tournaments);
+    currentScorerCtx = {tournamentId: l.id, matchId: partido.id, esLiga: true};
+    iniciarScorer(l, partido);
+    showView("scorer", {titulo:"Marcador"});
+  });
+
+  document.getElementById("buscar-liga").addEventListener("input", renderLigas);
 
   /* ===================== FILTROS DE LAS LISTAS ===================== */
   ["buscar-continuar","orden-continuar"].forEach(id=>{
@@ -2411,7 +2754,10 @@
       const t = eraTorneo ? getTournament(scorerState.tournamentId) : null;
       scorerState = null;
       cerrarSorteoMoneda();
-      if(t){
+      if(t && esLiga(t)){
+        currentLigaId = t.id;
+        showView("liga", {titulo: t.name});
+      } else if(t){
         currentBracketId = t.id;
         showView("bracket", {titulo: t.name});
       } else {
@@ -2444,7 +2790,11 @@
         match.winner = ganadorLado.ids[0];
         match.sets = scorerState.games;
         match.scoreLabel = scoreLabel;
-        if(esLiguilla(t)) comprobarFinLiguilla(t);
+        // Una liga no termina nunca sola: se le van añadiendo partidos.
+        // Una liguilla sí (cuando se juegan todos). Y la eliminatoria
+        // antigua hace avanzar al ganador a la ronda siguiente.
+        if(esLiga(t)){ /* la liga sigue abierta */ }
+        else if(esLiguilla(t)) comprobarFinLiguilla(t);
         else advanceWinner(t, ctx.roundIndex, ctx.matchIndex);
         saveTournaments(tournaments);
         scorerState = null;
@@ -2452,6 +2802,9 @@
           currentHistorialId = t.id;
           historialReciénFinalizado = true;
           showView("detalle-historial", {titulo: t.name});
+        } else if(esLiga(t)){
+          currentLigaId = t.id;
+          showView("liga", {titulo: t.name});
         } else {
           showView("bracket", {titulo: t.name});
         }
@@ -2497,7 +2850,7 @@
     const orden = document.getElementById("orden-historial").value;
     const tipo = document.getElementById("tipo-historial").value;
 
-    const itemsTorneos = tournaments.filter(t=>t.status==="finalizado").map(t=>({tipo:"torneo", obj:t, fecha:t.finishedAt}));
+    const itemsTorneos = tournaments.filter(t=>t.status==="finalizado" && !esLiga(t)).map(t=>({tipo:"torneo", obj:t, fecha:t.finishedAt}));
     const itemsSueltos = partidosSueltos.map(p=>({tipo:"libre", obj:p, fecha:p.playedAt}));
     const todos = itemsTorneos.concat(itemsSueltos);
 

@@ -86,7 +86,18 @@
   main{max-width:900px;margin:0 auto;padding:18px 16px 60px;}
 
   /* ---------- HOME ---------- */
-  #view-home main{max-width:1100px;}
+  /* El inicio ocupa exactamente la pantalla: nada de desplazar para ver
+     los botones de abajo. El bloque central se estira, el pie no. */
+  #view-home main{
+    max-width:1100px;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    padding-bottom:6px;
+  }
+  #view-home .home-wrap{flex:1 1 auto;min-height:0;}
+  #view-home footer.app-footer{flex:0 0 auto;}
   /* Controles del inicio, arriba a la derecha */
   .home-controles{
     display:flex;justify-content:flex-end;gap:8px;
@@ -206,13 +217,17 @@
         "bl . br";
       align-items:center;
       justify-items:center;
-      min-height:74vh;
-      gap:40px;
+      /* Que quepa entero sin desplazar: la altura la manda la pantalla. */
+      min-height:0;
+      gap:clamp(10px, 2vh, 32px);
       max-width:1100px;
     }
+    .home-header{gap:clamp(2px, .8vh, 10px);}
+    .logo-badge{width:clamp(56px, 11vh, 118px);height:clamp(56px, 11vh, 118px);}
+    .home-title{font-size:clamp(1.5rem, 5vh, 2.6rem);}
     .home-header{grid-area:header;}
     .corner-grid{display:contents;}
-    .corner-btn{width:clamp(220px, 24vw, 320px);}
+    .corner-btn{width:clamp(200px, 24vw, 320px);min-height:clamp(78px, 15vh, 170px);}
     #btn-jugadores{grid-area:tl;align-self:start;justify-self:start;}
     #btn-crear{grid-area:tr;align-self:start;justify-self:end;}
     #btn-continuar{grid-area:bl;align-self:end;justify-self:start;}
@@ -586,7 +601,7 @@
   }
 
   footer.app-footer{
-    text-align:center;padding:20px;color:var(--madera-oscura);font-size:.75rem;opacity:.7;
+    text-align:center;padding:10px 20px 16px;color:var(--madera-oscura);font-size:.75rem;opacity:.7;
   }
   .sync-estado{
     font-size:.78rem;font-weight:700;margin-bottom:10px;min-height:1.2em;
@@ -595,6 +610,16 @@
   .sync-estado.ok{color:var(--verde);}
   .sync-estado.error{color:var(--rojo);}
   .sync-estado.cargando{color:var(--azul);}
+
+  /* Pantallas bajas (iPad apaisado con la barra del navegador): el pie se
+     encoge para que los cuatro botones quepan sin desplazar. */
+  @media (max-height:780px){
+    #view-home footer.app-footer{padding:2px 10px 6px;font-size:.66rem;}
+    #view-home .sync-estado{margin-bottom:4px;font-size:.7rem;}
+    #view-home footer .btn{padding:5px 12px !important;min-height:30px;font-size:.7rem;}
+    .home-controles{padding:0 0 4px;}
+    .icon-btn-home{width:40px;height:40px;font-size:17px;}
+  }
 
   /* ---------- Pantalla completa: el marcador se vuelve un tanteador ---------- */
   body.pantalla-completa #view-scorer main{
@@ -852,6 +877,27 @@
         <button class="btn toggle-opcion activo" data-puntos="11" style="flex:1;">11 puntos</button>
         <button class="btn toggle-opcion" data-puntos="21" style="flex:1;">21 puntos</button>
       </div>
+    </div>
+    <div class="card">
+      <h3>Cómo se gana el partido</h3>
+      <div class="fila toggle-grupo" id="toggle-sets-rapido">
+        <button class="btn toggle-opcion activo" data-sets="1" style="flex:1;">Juego único</button>
+        <button class="btn toggle-opcion" data-sets="2" style="flex:1;">Mejor de 3</button>
+        <button class="btn toggle-opcion" data-sets="3" style="flex:1;">Mejor de 5</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>El saque cambia cada…</h3>
+      <div class="fila toggle-grupo" id="toggle-saque">
+        <button class="btn toggle-opcion" data-saque="2" style="flex:1;">2 puntos</button>
+        <button class="btn toggle-opcion activo" data-saque="3" style="flex:1;">3 puntos</button>
+        <button class="btn toggle-opcion" data-saque="5" style="flex:1;">5 puntos</button>
+      </div>
+      <div class="home-stats" style="margin-top:8px;" id="aviso-ventaja-rapido"></div>
+    </div>
+    <div class="card" id="card-liga-rapido">
+      <h3>¿Cuenta para una liga?</h3>
+      <div id="opciones-liga-rapido"></div>
     </div>
     <div class="fila" style="align-items:stretch;">
       <div class="card" style="flex:1;min-width:150px;">
@@ -1693,20 +1739,62 @@
   /* ===================== JUGAR PARTIDO (partida suelta) ===================== */
   let modoRapido = "1vs1";
   let puntosRapido = 11;
+  let setsRapido = 1;
+  let saqueRapido = 3;
+  let ligaRapidaId = "";     // "" = partido suelto
   let equipoASel = [];
   let equipoBSel = [];
 
   function maxPorEquipo(){ return modoRapido === "2vs2" ? 2 : 1; }
 
+  function renderOpcionesLigaRapido(){
+    const cont = document.getElementById("opciones-liga-rapido");
+    const ligas = getLigas();
+    // Sólo tiene sentido en 1vs1: la clasificación es individual.
+    const disponible = ligas.length > 0 && modoRapido === "1vs1";
+    document.getElementById("card-liga-rapido").classList.toggle("oculto", ligas.length === 0);
+    cont.innerHTML = "";
+    if(!ligas.length) return;
+
+    if(!disponible){
+      cont.innerHTML = '<div class="home-stats">Las ligas guardan clasificación individual, así que sólo se puede en 1 vs 1.</div>';
+      ligaRapidaId = "";
+      return;
+    }
+    const opciones = [{id:"", nombre:"No, es un partido suelto"}]
+      .concat(ligas.map(l=>({id:l.id, nombre:"🏅 "+l.name})));
+    opciones.forEach(o=>{
+      const marcado = ligaRapidaId === o.id;
+      const item = document.createElement("div");
+      item.className = "check-item" + (marcado?" marcado":"");
+      item.innerHTML = '<span class="caja-check'+(marcado?" activa":"")+'">'+(marcado?"✓":"")+'</span>'+
+                       '<span>'+escapeHtml(o.nombre)+'</span>';
+      item.addEventListener("click", ()=>{ ligaRapidaId = o.id; renderOpcionesLigaRapido(); });
+      cont.appendChild(item);
+    });
+  }
+
+  function renderAvisoVentajaRapido(){
+    document.getElementById("aviso-ventaja-rapido").textContent =
+      "Desde " + (puntosRapido - 1) + " puntos saca siempre quien va por detrás.";
+  }
+
   function renderJugarRapido(){
     modoRapido = "1vs1";
     puntosRapido = 11;
+    setsRapido = 1;
+    saqueRapido = 3;
+    ligaRapidaId = "";
     equipoASel = [];
     equipoBSel = [];
     document.querySelectorAll("#toggle-modo .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.modo===modoRapido));
     document.querySelectorAll("#toggle-puntos .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.puntos===String(puntosRapido)));
+    document.querySelectorAll("#toggle-sets-rapido .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.sets===String(setsRapido)));
+    document.querySelectorAll("#toggle-saque .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.saque===String(saqueRapido)));
     actualizarTitulosEquipo();
     renderChecklistsRapido();
+    renderOpcionesLigaRapido();
+    renderAvisoVentajaRapido();
   }
 
   function actualizarTitulosEquipo(){
@@ -1768,12 +1856,26 @@
       equipoBSel = equipoBSel.slice(0, max);
       actualizarTitulosEquipo();
       renderChecklistsRapido();
+      renderOpcionesLigaRapido();
     });
   });
   document.querySelectorAll("#toggle-puntos .toggle-opcion").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       puntosRapido = parseInt(btn.dataset.puntos,10);
       document.querySelectorAll("#toggle-puntos .toggle-opcion").forEach(b=>b.classList.toggle("activo", b===btn));
+      renderAvisoVentajaRapido();
+    });
+  });
+  document.querySelectorAll("#toggle-sets-rapido .toggle-opcion").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      setsRapido = parseInt(btn.dataset.sets,10);
+      document.querySelectorAll("#toggle-sets-rapido .toggle-opcion").forEach(b=>b.classList.toggle("activo", b===btn));
+    });
+  });
+  document.querySelectorAll("#toggle-saque .toggle-opcion").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      saqueRapido = parseInt(btn.dataset.saque,10);
+      document.querySelectorAll("#toggle-saque .toggle-opcion").forEach(b=>b.classList.toggle("activo", b===btn));
     });
   });
 
@@ -1783,7 +1885,29 @@
       alert(modoRapido==="2vs2" ? "Elige exactamente 2 jugadores para cada equipo." : "Elige un jugador para cada lado.");
       return;
     }
-    iniciarScorerLibre(modoRapido, equipoASel.slice(), equipoBSel.slice(), puntosRapido);
+    const liga = ligaRapidaId ? getLiga(ligaRapidaId) : null;
+    if(liga){
+      // El partido cuenta para la clasificación de esa liga: se crea dentro
+      // de ella, igual que si se hubiera añadido desde la propia liga.
+      const partido = {
+        id: uid("m"), jornada: 1,
+        a: equipoASel[0], b: equipoBSel[0],
+        winner: null, sets: [], scoreLabel: ""
+      };
+      liga.matches.push(partido);
+      saveTournaments(tournaments);
+      currentLigaId = liga.id;
+      currentScorerCtx = {tournamentId: liga.id, matchId: partido.id};
+      iniciarScorer(liga, partido);
+      scorerState.pointsPerGame = puntosRapido;
+      scorerState.setsToWin = setsRapido;
+      scorerState.saqueCada = saqueRapido;
+    } else {
+      iniciarScorerLibre(modoRapido, equipoASel.slice(), equipoBSel.slice(), puntosRapido);
+      scorerState.setsToWin = setsRapido;
+      scorerState.saqueCada = saqueRapido;
+    }
+    renderScorer();
     showView("scorer", {titulo:"Marcador"});
   });
 
@@ -2162,6 +2286,7 @@
       pointsLog: [],
       games: [],
       startServer: "a",
+      saqueCada: 3,
       ladosCambiados: false
     };
     prepararUIScorer();
@@ -2177,6 +2302,7 @@
       pointsLog: [],
       games: [],
       startServer: "a",
+      saqueCada: 3,
       ladosCambiados: false
     };
     prepararUIScorer();
@@ -2541,8 +2667,9 @@
       return (total % 2 === 0) ? scorerState.startServer : other;
     }
 
-    // Fase normal: el saque cambia cada 3 puntos.
-    return (Math.floor(total/3) % 2 === 0) ? scorerState.startServer : other;
+    // Fase normal: el saque cambia cada N puntos (3 por defecto).
+    const cada = scorerState.saqueCada || 3;
+    return (Math.floor(total/cada) % 2 === 0) ? scorerState.startServer : other;
   }
 
   // Cambio de campo: sólo afecta a qué panel se pinta cada jugador. Los
@@ -2573,7 +2700,7 @@
       aviso.textContent = "⚡ Ventaja: saca siempre quien va por detrás";
       aviso.classList.add("activo");
     } else {
-      aviso.textContent = "Saque cada 3 puntos · desde " + umbralVentaja() + " saca quien va por detrás";
+      aviso.textContent = "Saque cada " + (scorerState.saqueCada || 3) + " puntos · desde " + umbralVentaja() + " saca quien va por detrás";
       aviso.classList.remove("activo");
     }
 
@@ -3141,7 +3268,20 @@
 
   showView("home");
 
-  document.getElementById("btn-recargar-online").addEventListener("click", cargarDelServidor);
+  /**
+   * Actualizar = recargar la app de verdad.
+   * Antes sólo volvía a pedir los datos, así que una versión nueva de la
+   * app nunca llegaba y parecía que el botón no hacía nada. Ahora sube lo
+   * que quede pendiente y recarga saltándose la caché del navegador.
+   */
+  document.getElementById("btn-recargar-online").addEventListener("click", async ()=>{
+    estadoSync("⏳ Actualizando la aplicación…", "cargando");
+    try{ if(hayBackend()) await sincronizar(false); }catch(e){}
+    // El parámetro obliga al navegador a traerse el archivo nuevo; sin él
+    // GitHub Pages puede servir la versión guardada en caché.
+    const base = location.href.split("?")[0].split("#")[0];
+    location.replace(base + "?v=" + Date.now());
+  });
   if(hayBackend()){
     cargarDelServidor();
     // Al volver a la app (cambio de pestaña, desbloquear el iPad) traemos

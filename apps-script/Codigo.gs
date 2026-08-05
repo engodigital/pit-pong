@@ -99,6 +99,32 @@ function escribirTabla_(nombre, filas) {
 
 /* ============ Conversión entre el modelo de la app y las hojas ============ */
 
+/**
+ * Devuelve los partidos de un torneo sea cual sea su formato:
+ *  - liguilla / liga  -> t.matches (lista plana, cada uno con su jornada)
+ *  - eliminatoria     -> t.rounds  (rondas: cuartos, semis, final)
+ * Así los resultados y los parciales acaban siempre en la hoja.
+ */
+function partidosDe_(t) {
+  if (t.matches && t.matches.length) return t.matches;
+  if (!t.rounds) return [];
+  var salida = [];
+  t.rounds.forEach(function (ronda, iRonda) {
+    ronda.forEach(function (m, iPartido) {
+      if (!m.a && !m.b) return;                 // hueco del cuadro, no es un partido
+      salida.push({
+        id: m.id || (t.id + '_r' + iRonda + 'p' + iPartido),
+        jornada: iRonda + 1,                    // ronda 1 = primera eliminatoria
+        a: m.a, b: m.b,
+        winner: m.winner || null,
+        sets: m.sets || [],
+        scoreLabel: m.scoreLabel || ''
+      });
+    });
+  });
+  return salida;
+}
+
 function nombresDe_(ids, mapaJugadores) {
   return (ids || []).map(function (id) {
     return mapaJugadores[id] || id;
@@ -158,7 +184,12 @@ function doPost(e) {
 
 function cargarTodo_() {
   var jugadores = leerTabla_('Jugadores').map(function (f) {
-    return { id: String(f.id), name: String(f.nombre), creadoEn: f.creadoEn || '' };
+    return {
+      id: String(f.id),
+      name: String(f.nombre),
+      creadoEn: f.creadoEn || '',
+      photo: f.foto ? String(f.foto) : ''
+    };
   });
 
   var partidosPorTorneo = {};
@@ -192,10 +223,28 @@ function cargarTodo_() {
 
   var torneos = leerTabla_('Torneos').map(function (f) {
     var id = String(f.id);
+    var formato = String(f.formato || 'liguilla');
+    var partidos = partidosPorTorneo[id] || [];
+
+    // La eliminatoria antigua se guarda plana, pero la app la necesita en
+    // rondas. La reconstruimos agrupando por jornada (= ronda).
+    var rounds = null;
+    if (formato === 'eliminatoria') {
+      var porRonda = {};
+      partidos.forEach(function (m) {
+        var r = m.jornada || 1;
+        if (!porRonda[r]) porRonda[r] = [];
+        porRonda[r].push(m);
+      });
+      rounds = Object.keys(porRonda)
+        .sort(function (x, y) { return Number(x) - Number(y); })
+        .map(function (k) { return porRonda[k]; });
+    }
+
     return {
       id: id,
       name: String(f.nombre),
-      format: String(f.formato || 'liguilla'),
+      format: formato,
       status: String(f.estado || 'activo'),
       pointsPerGame: Number(f.puntosPorJuego) || 11,
       setsToWin: Number(f.juegosParaGanar) || 2,
@@ -204,7 +253,8 @@ function cargarTodo_() {
       champion: f.campeonId ? String(f.campeonId) : null,
       createdAt: f.creadoEn ? new Date(f.creadoEn).getTime() : Date.now(),
       finishedAt: f.finalizadoEn ? new Date(f.finalizadoEn).getTime() : null,
-      matches: partidosPorTorneo[id] || [],
+      matches: rounds ? undefined : partidos,
+      rounds: rounds || undefined,
       photos: fotosPorRegistro[id] || []
     };
   });
@@ -259,14 +309,19 @@ function guardarTodo_(datos) {
 
     escribirTabla_('Jugadores', jugadores.map(function (j) {
       // Conservamos la fecha de alta original si ya estaba en la hoja.
-      return { id: j.id, nombre: j.name, creadoEn: j.creadoEn || fecha_(Date.now()) };
+      return {
+        id: j.id,
+        nombre: j.name,
+        creadoEn: j.creadoEn || fecha_(Date.now()),
+        foto: j.photo || ''
+      };
     }));
 
     escribirTabla_('Torneos', torneos.map(function (t) {
       return {
         id: t.id,
         nombre: t.name,
-        formato: t.format || 'liguilla',
+        formato: t.format || (t.rounds ? 'eliminatoria' : 'liguilla'),
         estado: t.status,
         puntosPorJuego: t.pointsPerGame,
         juegosParaGanar: t.setsToWin,
@@ -281,7 +336,10 @@ function guardarTodo_(datos) {
 
     var filasPartidos = [];
     torneos.forEach(function (t) {
-      (t.matches || []).forEach(function (m) {
+      // Un torneo puede venir en dos formas: liguilla/liga (lista plana de
+      // partidos) o eliminatoria antigua (rondas). Las dos se guardan igual
+      // en la hoja para que los puntos queden siempre registrados.
+      partidosDe_(t).forEach(function (m) {
         filasPartidos.push({
           id: m.id,
           torneoId: t.id,

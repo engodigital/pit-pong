@@ -322,6 +322,9 @@
   .jugador-item{
     display:flex;align-items:center;gap:10px;
     background:#fff8ec;border:1px solid var(--madera);border-radius:10px;padding:8px 10px;
+    /* En pantallas estrechas los botones (stats/editar/eliminar) saltan a una
+       segunda línea en vez de salirse de la tarjeta. */
+    flex-wrap:wrap;
   }
   .avatar{
     width:38px;height:38px;border-radius:50%;
@@ -343,6 +346,45 @@
     width:18px;height:18px;font-size:10px;line-height:18px;
     text-align:center;border:2px solid var(--crema);
   }
+
+  /* Panel de estadísticas de un jugador (se abre bajo su fila) */
+  .stats-panel{
+    background:#fff8ec;border:1px solid var(--madera);border-radius:10px;
+    padding:12px;margin-top:-4px;
+  }
+  .stats-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  .stats-caja{
+    flex:1;min-width:70px;text-align:center;
+    background:var(--crema);border:1px solid var(--madera);border-radius:8px;padding:8px 4px;
+  }
+  .stats-caja .num{font-size:1.4rem;font-weight:800;display:block;}
+  .stats-caja .eti{font-size:.7rem;opacity:.75;}
+  .barra-victorias{
+    height:14px;border-radius:7px;background:#e5c9c2;overflow:hidden;
+    border:1px solid var(--madera);margin-bottom:10px;
+  }
+  .barra-victorias > div{height:100%;background:var(--verde, #2e7d4f);border-radius:7px 0 0 7px;}
+  .chips-racha{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+  .chip-res{
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:.72rem;font-weight:800;color:#fff;
+  }
+  .chip-res.v{background:#2e7d4f;}
+  .chip-res.d{background:#b0503c;}
+  .stats-historial{display:flex;flex-direction:column;gap:6px;}
+  .stats-partido{
+    display:flex;align-items:center;gap:8px;
+    background:var(--crema);border:1px solid var(--madera);border-radius:8px;
+    padding:6px 9px;font-size:.85rem;
+  }
+  .stats-partido .res{font-weight:800;flex-shrink:0;}
+  .stats-partido .res.v{color:#2e7d4f;}
+  .stats-partido .res.d{color:#b0503c;}
+  .stats-partido .detalle{flex:1;min-width:0;}
+  .stats-partido .comp{display:block;font-size:.72rem;opacity:.7;}
+  .stats-partido .marcador{flex-shrink:0;font-weight:700;opacity:.85;}
+  .stats-titulo{font-size:.8rem;font-weight:800;margin:6px 0 6px;opacity:.8;}
 
   /* Sin altura máxima ni scroll propio: dos listas con scroll interno una al
      lado de otra hacían muy difícil desplazar la página con el dedo. */
@@ -829,7 +871,7 @@
     <div class="card">
       <h3>Añadir jugador</h3>
       <div class="fila">
-        <input type="text" id="input-nuevo-jugador" placeholder="Nombre del jugador" maxlength="30">
+        <input type="text" id="input-nuevo-jugador" placeholder="Nombre del jugador" maxlength="30" style="flex:1;min-width:180px;width:auto;">
         <button class="btn" id="btn-add-jugador">+ Añadir</button>
       </div>
       <div class="home-stats" style="margin-top:10px;">Toca la foto de un jugador para ponerle o cambiarle la imagen.</div>
@@ -911,7 +953,10 @@
         <button class="btn toggle-opcion activo" data-saque="3" style="flex:1;">3 puntos</button>
         <button class="btn toggle-opcion" data-saque="5" style="flex:1;">5 puntos</button>
       </div>
-      <div class="home-stats" style="margin-top:8px;" id="aviso-ventaja-rapido"></div>
+      <div class="check-item marcado" id="check-ventaja-rapido" style="margin-top:8px;">
+        <span class="caja-check activa" id="caja-ventaja-rapido">✓</span>
+        <span id="texto-ventaja-rapido">Desde 10 puntos saca siempre quien va por detrás</span>
+      </div>
     </div>
     <div class="card" id="card-liga-rapido">
       <h3>¿Cuenta para una liga?</h3>
@@ -928,6 +973,13 @@
       </div>
     </div>
     <div class="vacio oculto" id="jugar-rapido-vacio">Añade al menos 2 jugadores para poder jugar.</div>
+    <div class="card">
+      <h3>¿Falta alguien? Añádelo aquí</h3>
+      <div class="fila">
+        <input type="text" id="input-jugador-rapido" placeholder="Nombre del jugador nuevo" maxlength="30" style="flex:1;min-width:180px;width:auto;">
+        <button class="btn" id="btn-add-jugador-rapido">+ Añadir</button>
+      </div>
+    </div>
     <button class="btn dorado" id="btn-empezar-rapido" style="width:100%;font-size:1.05rem;">🏓 Empezar partido</button>
   </main>
 </section>
@@ -1318,7 +1370,11 @@
     players         = unirConLocal(players,         remotos,                    eliminados.jugadores);
     tournaments     = unirConLocal(tournaments,     datos.torneos || [],        eliminados.torneos);
     partidosSueltos = unirConLocal(partidosSueltos, datos.partidosSueltos || [], eliminados.partidosSueltos);
-    eliminados = {jugadores:[],torneos:[],partidosSueltos:[]};
+    // OJO: eliminados NO se vacía aquí. Antes se vaciaba y había una carrera:
+    // si esta respuesta llegaba antes de subir un borrado, la lápida se
+    // perdía y el servidor devolvía el registro "resucitado". Ahora las
+    // lápidas sólo se limpian en sincronizar(), cuando el servidor confirma
+    // que las ha procesado.
 
     // Al juntar los datos de varios dispositivos pueden aparecer dos veces
     // el mismo jugador: los unimos antes de guardar nada.
@@ -1348,6 +1404,9 @@
     if(!hayBackend() || sincronizando){ if(sincronizando) guardadoPendiente = true; return; }
     sincronizando = true;
     if(mostrar !== false) estadoSync("⏳ Sincronizando…", "cargando");
+    // Copia de lo que se envía: si mientras el guardado viaja se borra algo
+    // más, esa lápida nueva no se debe dar por procesada.
+    const elimEnviados = JSON.parse(JSON.stringify(eliminados));
     try{
       const data = await llamarApi({
         accion: "guardar",
@@ -1360,9 +1419,14 @@
           })),
           torneos: tournaments,
           partidosSueltos: partidosSueltos,
-          eliminados: eliminados
+          eliminados: elimEnviados
         }
       });
+      // El servidor ya procesó estas lápidas: se pueden retirar.
+      ["jugadores","torneos","partidosSueltos"].forEach(k=>{
+        eliminados[k] = eliminados[k].filter(id=>!elimEnviados[k].includes(id));
+      });
+      saveEliminados();
       aplicarDatosDelServidor(data.datos);
       estadoSync("✅ Guardado online", "ok");
       refrescarVistaActual();
@@ -1533,6 +1597,95 @@
 
   /* ===================== JUGADORES ===================== */
   let editandoJugadorId = null;
+  let statsJugadorId = null;   // jugador con el panel de estadísticas abierto
+
+  /**
+   * Reúne todos los partidos terminados de un jugador, vengan de donde
+   * vengan: torneos en liguilla, ligas, la eliminatoria antigua (rounds)
+   * o partidas sueltas 1vs1 / 2vs2.
+   */
+  function partidosDeJugador(id){
+    const salida = [];
+    tournaments.forEach(t=>{
+      const listas = [];
+      if(t.matches && t.matches.length) listas.push(t.matches);
+      (t.rounds||[]).forEach(r=>listas.push(r));
+      listas.forEach(lista=>lista.forEach(m=>{
+        if(!m.winner || (m.a!==id && m.b!==id)) return;
+        const rivalId = m.a===id ? m.b : m.a;
+        salida.push({
+          gano: m.winner===id,
+          rival: playerName(rivalId),
+          comp: t.name,
+          marcador: m.scoreLabel || "",
+          orden: (t.createdAt||0) + (m.jornada||0)
+        });
+      }));
+    });
+    partidosSueltos.forEach(p=>{
+      const enA = (p.equipoA||[]).includes(id);
+      const enB = (p.equipoB||[]).includes(id);
+      if(!enA && !enB) return;
+      const miLado = enA ? "A" : "B";
+      const rivales = (enA ? p.equipoB : p.equipoA).map(playerName).join(" + ");
+      const companeros = (enA ? p.equipoA : p.equipoB).filter(x=>x!==id).map(playerName);
+      salida.push({
+        gano: p.ganador===miLado,
+        rival: rivales,
+        comp: p.modo==="2vs2"
+          ? "Partida 2vs2" + (companeros.length ? " (con "+companeros.join(" + ")+")" : "")
+          : "Partida suelta",
+        marcador: p.scoreLabel || "",
+        orden: p.playedAt || 0
+      });
+    });
+    // Más reciente primero. Los partidos de torneo se ordenan por la fecha
+    // de creación del torneo y su jornada: el modelo no guarda hora exacta.
+    salida.sort((x,y)=>y.orden - x.orden);
+    return salida;
+  }
+
+  function statsPanelHtml(p){
+    const partidos = partidosDeJugador(p.id);
+    const pj = partidos.length;
+    const pg = partidos.filter(x=>x.gano).length;
+    const pp = pj - pg;
+    const pct = pj ? Math.round(pg*100/pj) : 0;
+    // Racha actual: cuántos seguidos con el mismo resultado que el último.
+    let racha = 0;
+    for(const x of partidos){ if(x.gano === (partidos[0]||{}).gano) racha++; else break; }
+    const rachaTxt = pj ? (partidos[0].gano ? racha+"V" : racha+"D") : "—";
+
+    let html = '<div class="stats-panel">';
+    html += '<div class="stats-grid">'+
+      '<div class="stats-caja"><span class="num">'+pj+'</span><span class="eti">Jugados</span></div>'+
+      '<div class="stats-caja"><span class="num" style="color:#2e7d4f;">'+pg+'</span><span class="eti">Ganados</span></div>'+
+      '<div class="stats-caja"><span class="num" style="color:#b0503c;">'+pp+'</span><span class="eti">Perdidos</span></div>'+
+      '<div class="stats-caja"><span class="num" style="color:'+(pj && partidos[0].gano ? '#2e7d4f' : (pj ? '#b0503c' : 'inherit'))+';">'+rachaTxt+'</span><span class="eti">Racha</span></div>'+
+    '</div>';
+    if(pj){
+      html += '<div class="stats-titulo">'+pct+'% de victorias</div>';
+      html += '<div class="barra-victorias"><div style="width:'+pct+'%;"></div></div>';
+      html += '<div class="stats-titulo">Últimos partidos (el más reciente primero)</div>';
+      html += '<div class="chips-racha">'+
+        partidos.slice(0,10).map(x=>'<span class="chip-res '+(x.gano?"v":"d")+'">'+(x.gano?"V":"D")+'</span>').join("")+
+      '</div>';
+      html += '<div class="stats-titulo">Historial</div><div class="stats-historial">'+
+        partidos.map(x=>
+          '<div class="stats-partido">'+
+            '<span class="res '+(x.gano?"v":"d")+'">'+(x.gano?"✓":"✗")+'</span>'+
+            '<span class="detalle">vs '+escapeHtml(x.rival)+
+              '<span class="comp">'+escapeHtml(x.comp)+'</span></span>'+
+            (x.marcador ? '<span class="marcador">'+escapeHtml(x.marcador)+'</span>' : '')+
+          '</div>'
+        ).join("")+
+      '</div>';
+    } else {
+      html += '<div class="home-stats">Todavía no ha jugado ningún partido.</div>';
+    }
+    html += '</div>';
+    return html;
+  }
   let jugadorFotoId = null;
 
   // Foto de perfil: se recorta cuadrada y pequeña (256px) porque sólo se usa
@@ -1600,11 +1753,24 @@
             avatarHtml(p.id, 44)+'<span class="avatar-camara">📷</span>'+
           '</button>'+
           '<div class="jugador-nombre">'+escapeHtml(p.name)+'</div>'+
+          '<button class="btn small'+(statsJugadorId===p.id?' dorado':'')+'" data-stats="'+p.id+'">📊</button>'+
           (p.photo ? '<button class="btn ghost small" data-quitar-foto="'+p.id+'">Quitar foto</button>' : '')+
           '<button class="btn madera small" data-editar="'+p.id+'">Editar</button>'+
           '<button class="btn rojo small" data-del="'+p.id+'">Eliminar</button>';
       }
       cont.appendChild(div);
+      if(statsJugadorId === p.id){
+        const panel = document.createElement("div");
+        panel.innerHTML = statsPanelHtml(p);
+        cont.appendChild(panel.firstChild);
+      }
+    });
+    cont.querySelectorAll("[data-stats]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-stats");
+        statsJugadorId = (statsJugadorId === id) ? null : id;
+        renderJugadores();
+      });
     });
     cont.querySelectorAll("[data-foto]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
@@ -1671,20 +1837,27 @@
 
   document.getElementById("btn-add-jugador").addEventListener("click", addJugador);
   document.getElementById("input-nuevo-jugador").addEventListener("keydown", e=>{ if(e.key==="Enter") addJugador(); });
-  function addJugador(){
-    const input = document.getElementById("input-nuevo-jugador");
-    const name = input.value.trim();
-    if(!name) return;
+  function crearJugadorNuevo(name){
+    name = (name || "").trim();
+    if(!name) return null;
     // Evitamos duplicados: con varios dispositivos es fácil añadir dos veces
     // al mismo jugador y luego la clasificación queda partida en dos.
     const yaExiste = players.some(p => normalizarBusqueda(p.name) === normalizarBusqueda(name));
     if(yaExiste){
       alert("Ya hay un jugador que se llama \"" + name + "\".");
-      input.select();
+      return null;
+    }
+    const nuevo = {id: uid("p"), name: name};
+    players.push(nuevo);
+    savePlayers(players);
+    return nuevo;
+  }
+  function addJugador(){
+    const input = document.getElementById("input-nuevo-jugador");
+    if(!crearJugadorNuevo(input.value)){
+      if(input.value.trim()) input.select();
       return;
     }
-    players.push({id: uid("p"), name: name});
-    savePlayers(players);
     input.value = "";
     renderJugadores();
   }
@@ -1759,6 +1932,7 @@
   let puntosRapido = 11;
   let setsRapido = 1;
   let saqueRapido = 3;
+  let ventajaRapido = true;  // desde puntos-1, saca siempre quien va por detrás
   let ligaRapidaId = "";     // "" = partido suelto
   let equipoASel = [];
   let equipoBSel = [];
@@ -1793,8 +1967,13 @@
   }
 
   function renderAvisoVentajaRapido(){
-    document.getElementById("aviso-ventaja-rapido").textContent =
-      "Desde " + (puntosRapido - 1) + " puntos saca siempre quien va por detrás.";
+    const item = document.getElementById("check-ventaja-rapido");
+    const caja = document.getElementById("caja-ventaja-rapido");
+    item.classList.toggle("marcado", ventajaRapido);
+    caja.classList.toggle("activa", ventajaRapido);
+    caja.textContent = ventajaRapido ? "✓" : "";
+    document.getElementById("texto-ventaja-rapido").textContent =
+      "Desde " + (puntosRapido - 1) + " puntos saca siempre quien va por detrás";
   }
 
   function renderJugarRapido(){
@@ -1802,6 +1981,7 @@
     puntosRapido = 11;
     setsRapido = 1;
     saqueRapido = 3;
+    ventajaRapido = true;
     ligaRapidaId = "";
     equipoASel = [];
     equipoBSel = [];
@@ -1896,6 +2076,22 @@
       document.querySelectorAll("#toggle-saque .toggle-opcion").forEach(b=>b.classList.toggle("activo", b===btn));
     });
   });
+  document.getElementById("check-ventaja-rapido").addEventListener("click", ()=>{
+    ventajaRapido = !ventajaRapido;
+    renderAvisoVentajaRapido();
+  });
+
+  document.getElementById("btn-add-jugador-rapido").addEventListener("click", addJugadorRapido);
+  document.getElementById("input-jugador-rapido").addEventListener("keydown", e=>{ if(e.key==="Enter") addJugadorRapido(); });
+  function addJugadorRapido(){
+    const input = document.getElementById("input-jugador-rapido");
+    if(!crearJugadorNuevo(input.value)){
+      if(input.value.trim()) input.select();
+      return;
+    }
+    input.value = "";
+    renderChecklistsRapido();
+  }
 
   document.getElementById("btn-empezar-rapido").addEventListener("click", ()=>{
     const max = maxPorEquipo();
@@ -1920,10 +2116,12 @@
       scorerState.pointsPerGame = puntosRapido;
       scorerState.setsToWin = setsRapido;
       scorerState.saqueCada = saqueRapido;
+      scorerState.ventajaPerdedor = ventajaRapido;
     } else {
       iniciarScorerLibre(modoRapido, equipoASel.slice(), equipoBSel.slice(), puntosRapido);
       scorerState.setsToWin = setsRapido;
       scorerState.saqueCada = saqueRapido;
+      scorerState.ventajaPerdedor = ventajaRapido;
     }
     renderScorer();
     showView("scorer", {titulo:"Marcador"});
@@ -2305,6 +2503,7 @@
       games: [],
       startServer: "a",
       saqueCada: 3,
+      ventajaPerdedor: true,
       ladosCambiados: false
     };
     prepararUIScorer();
@@ -2321,6 +2520,7 @@
       games: [],
       startServer: "a",
       saqueCada: 3,
+      ventajaPerdedor: true,
       ladosCambiados: false
     };
     prepararUIScorer();
@@ -2667,6 +2867,9 @@
   function umbralVentaja(){ return scorerState.pointsPerGame - 1; }
 
   function enFaseVentaja(){
+    // La regla se puede apagar al configurar el partido; los estados antiguos
+    // no tienen el campo, así que sólo un false explícito la desactiva.
+    if(scorerState.ventajaPerdedor === false) return false;
     const {a,b} = currentGameScore();
     return a >= umbralVentaja() || b >= umbralVentaja();
   }
@@ -2718,7 +2921,10 @@
       aviso.textContent = "⚡ Ventaja: saca siempre quien va por detrás";
       aviso.classList.add("activo");
     } else {
-      aviso.textContent = "Saque cada " + (scorerState.saqueCada || 3) + " puntos · desde " + umbralVentaja() + " saca quien va por detrás";
+      const base = "Saque cada " + (scorerState.saqueCada || 3) + " puntos";
+      aviso.textContent = scorerState.ventajaPerdedor === false
+        ? base
+        : base + " · desde " + umbralVentaja() + " saca quien va por detrás";
       aviso.classList.remove("activo");
     }
 
@@ -3283,6 +3489,27 @@
     saveTournaments(tournaments);
     savePartidosSueltos(partidosSueltos);
   }
+
+  /**
+   * Limpieza de agosto 2026: datos de prueba que se colaron durante el
+   * desarrollo. Cada dispositivo la aplica UNA vez al arrancar: los marca
+   * como eliminados y los quita de su copia local. Sin esto, un dispositivo
+   * con los datos viejos los volvería a subir en su siguiente sincronización,
+   * porque el servidor no recuerda qué se borró (fusiona por id).
+   */
+  (function limpiezaDatosPrueba(){
+    const FLAG = "pitpong_limpieza_2026_08";
+    if(localStorage.getItem(FLAG)) return;
+    const JUGADORES_FUERA = ["p2","j3","j1","j2","j4"];
+    const TORNEOS_FUERA = ["t_local","lg_6o3lr5klmsghzb2b","lg_13mjk4epmsgi0ba9"];
+    JUGADORES_FUERA.forEach(id=>marcarEliminado("jugadores", id));
+    TORNEOS_FUERA.forEach(id=>marcarEliminado("torneos", id));
+    players = players.filter(p=>!JUGADORES_FUERA.includes(p.id));
+    tournaments = tournaments.filter(t=>!TORNEOS_FUERA.includes(t.id));
+    localStorage.setItem(FLAG, "1");
+    savePlayers(players);
+    saveTournaments(tournaments);
+  })();
 
   showView("home");
 

@@ -1694,48 +1694,81 @@
     }
   }
 
-  /* ===================== RANKING DEL CLUB ===================== */
-  // Clasificación general con TODOS los partidos (torneos, ligas y sueltos).
-  // Con menos de MIN_PARTIDOS no se entra: un 1 de 1 no puede liderar nada.
-  const MIN_PARTIDOS_RANKING = 2;
+  /* ===================== RANKING DEL CLUB (estilo ATP) ===================== */
+  /**
+   * Medallero de los torneos FINALIZADOS (las ligas no terminan, no reparten
+   * medallas): oro al campeón, plata al segundo y bronce al tercero.
+   *  - Liguilla: posiciones 1, 2 y 3 de su clasificación.
+   *  - Eliminatoria: campeón, perdedor de la final, y perdedores de las
+   *    semifinales (bronce para los dos, como en muchos torneos reales).
+   */
+  function medalleroClub(){
+    const med = {};
+    const dar = (id, tipo) => {
+      if(!id) return;
+      (med[id] = med[id] || {oro:0, plata:0, bronce:0})[tipo]++;
+    };
+    tournaments.filter(t=>t.status==="finalizado").forEach(t=>{
+      if(esLiguilla(t)){
+        const cl = calcularClasificacion(t);
+        if(cl[0]) dar(cl[0].id, "oro");
+        if(cl[1]) dar(cl[1].id, "plata");
+        if(cl[2]) dar(cl[2].id, "bronce");
+      } else if(t.rounds && t.rounds.length){
+        dar(t.champion, "oro");
+        const final = t.rounds[t.rounds.length-1][0];
+        if(final && final.winner && final.a && final.b){
+          dar(final.a === final.winner ? final.b : final.a, "plata");
+        }
+        if(t.rounds.length >= 2){
+          t.rounds[t.rounds.length-2].forEach(m=>{
+            if(m.winner && m.a && m.b) dar(m.a === m.winner ? m.b : m.a, "bronce");
+          });
+        }
+      } else if(t.champion){
+        dar(t.champion, "oro");
+      }
+    });
+    return med;
+  }
+
   function renderRanking(){
     const cont = document.getElementById("ranking-contenido");
     const vacio = document.getElementById("ranking-vacio");
+    const medallero = medalleroClub();
     const filas = players.map(p=>{
       const partidos = partidosDeJugador(p.id);
       const pj = partidos.length;
       const pg = partidos.filter(x=>x.gano).length;
-      return {id:p.id, pj, pg, pp:pj-pg, pct: pj ? Math.round(pg*100/pj) : 0};
+      const m = medallero[p.id] || {oro:0, plata:0, bronce:0};
+      return {id:p.id, pj, pg, pp:pj-pg, pct: pj ? Math.round(pg*100/pj) : 0,
+              oro:m.oro, plata:m.plata, bronce:m.bronce};
     });
     const nombre = f => playerName(f.id);
-    const clasificados = filas.filter(f=>f.pj >= MIN_PARTIDOS_RANKING)
-      .sort((a,b)=> b.pct-a.pct || b.pg-a.pg || a.pj-b.pj || nombre(a).localeCompare(nombre(b),"es"));
-    const pocos = filas.filter(f=>f.pj > 0 && f.pj < MIN_PARTIDOS_RANKING)
-      .sort((a,b)=> b.pj-a.pj || nombre(a).localeCompare(nombre(b),"es"));
-    const sinJugar = filas.filter(f=>f.pj === 0);
+    // Estilo ATP: mandan las medallas de torneo; a igualdad, las victorias.
+    const conActividad = filas.filter(f=>f.pj > 0 || f.oro || f.plata || f.bronce)
+      .sort((a,b)=> b.oro-a.oro || b.plata-a.plata || b.bronce-a.bronce ||
+                    b.pg-a.pg || b.pct-a.pct || a.pj-b.pj ||
+                    nombre(a).localeCompare(nombre(b),"es"));
+    const sinJugar = filas.filter(f=>f.pj === 0 && !f.oro && !f.plata && !f.bronce);
 
-    const hayAlgo = clasificados.length > 0 || pocos.length > 0;
-    vacio.classList.toggle("oculto", hayAlgo);
+    vacio.classList.toggle("oculto", conActividad.length > 0);
     cont.innerHTML = "";
-    if(!hayAlgo) return;
+    if(!conActividad.length) return;
 
-    const medallas = ["🥇","🥈","🥉"];
-    const celda = f =>
-      '<td class="col-nombre"><span class="ranking-fila-nombre">'+avatarHtml(f.id,26)+
-      '<span>'+escapeHtml(nombre(f))+'</span></span></td>'+
-      '<td>'+f.pj+'</td><td><strong>'+f.pg+'</strong></td><td>'+f.pp+'</td><td>'+f.pct+'%</td>';
+    const num = n => n ? '<strong>'+n+'</strong>' : '<span style="opacity:.35;">·</span>';
     let html = '<div class="tabla-wrap"><table class="tabla-clasif">'+
-      '<thead><tr><th>#</th><th>Jugador</th><th>PJ</th><th>PG</th><th>PP</th><th>%V</th></tr></thead><tbody>';
-    clasificados.forEach((f,i)=>{
-      html += '<tr'+(i===0?' class="fila-campeon"':'')+'><td>'+(medallas[i]||(i+1))+'</td>'+celda(f)+'</tr>';
-    });
-    pocos.forEach(f=>{
-      html += '<tr class="ranking-pocos"><td>—</td>'+celda(f)+'</tr>';
+      '<thead><tr><th>#</th><th>Jugador</th><th>🥇</th><th>🥈</th><th>🥉</th><th>PG</th><th>PJ</th><th>%V</th></tr></thead><tbody>';
+    conActividad.forEach((f,i)=>{
+      html += '<tr'+(i===0?' class="fila-campeon"':'')+'>'+
+        '<td>'+(i+1)+'</td>'+
+        '<td class="col-nombre"><span class="ranking-fila-nombre">'+avatarHtml(f.id,26)+
+          '<span>'+escapeHtml(nombre(f))+'</span></span></td>'+
+        '<td>'+num(f.oro)+'</td><td>'+num(f.plata)+'</td><td>'+num(f.bronce)+'</td>'+
+        '<td><strong>'+f.pg+'</strong></td><td>'+f.pj+'</td><td>'+f.pct+'%</td></tr>';
     });
     html += '</tbody></table></div>';
-    if(pocos.length){
-      html += '<div class="home-stats" style="margin-top:8px;">Con menos de '+MIN_PARTIDOS_RANKING+' partidos todavía no se entra en el ranking.</div>';
-    }
+    html += '<div class="home-stats" style="margin-top:8px;">Ordena por medallas de torneo (🥇 oro, 🥈 plata, 🥉 bronce a los semifinalistas) y, a igualdad, por victorias.</div>';
     if(sinJugar.length){
       html += '<div class="home-stats">Sin estrenar: '+sinJugar.map(f=>escapeHtml(nombre(f))).join(", ")+'</div>';
     }

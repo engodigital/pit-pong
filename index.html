@@ -153,7 +153,7 @@
     max-width:100%;
   }
   .logo-badge{
-    width:118px;height:118px;
+    width:150px;height:150px;
     border-radius:50%;
     overflow:hidden;
     border:5px solid var(--madera-oscura);
@@ -241,7 +241,7 @@
       max-width:1100px;
     }
     .home-header{gap:clamp(2px, .8vh, 10px);}
-    .logo-badge{width:clamp(56px, 11vh, 118px);height:clamp(56px, 11vh, 118px);}
+    .logo-badge{width:clamp(64px, 14vh, 150px);height:clamp(64px, 14vh, 150px);}
     .home-title{font-size:clamp(1.5rem, 5vh, 2.6rem);}
     .home-header{grid-area:header;}
     .corner-grid{display:contents;}
@@ -745,7 +745,7 @@
 
     .home-wrap{min-height:auto;gap:8px;padding:4px 10px 0;}
     .home-header{gap:4px;}
-    .logo-badge{width:52px;height:52px;border-width:3px;}
+    .logo-badge{width:66px;height:66px;border-width:3px;}
     .home-title{font-size:1.4rem;}
     .home-subtitle{font-size:.65rem;letter-spacing:.5px;}
     .home-stats{font-size:.66rem;}
@@ -3668,6 +3668,28 @@
     localStorage.setItem(FLAG, "1");
     savePlayers(players);
     saveTournaments(tournaments);
+  })();
+
+  /**
+   * El torneo oficial se guardó con año 2025 en vez de 2026. Corregirlo sólo
+   * en la hoja no bastó: cualquier dispositivo con la copia vieja volvía a
+   * subir las fechas malas al guardar (por la fusión por id). Como la purga,
+   * la corrección viaja en la app y cada dispositivo la aplica una vez.
+   */
+  (function corregirFechas2025(){
+    const FLAG = "pitpong_fix_fechas_2026";
+    if(localStorage.getItem(FLAG)) return;
+    const UN_ANO = 365*24*60*60*1000; // ago 2025 → ago 2026, sin 29 de febrero en medio
+    const es2025 = ts => !!ts && new Date(ts).getFullYear() === 2025;
+    const t = tournaments.find(x=>x.id==="t_elim_real");
+    if(t){
+      if(es2025(t.createdAt)) t.createdAt += UN_ANO;
+      if(es2025(t.finishedAt)) t.finishedAt += UN_ANO;
+      (t.rounds||[]).forEach(r=>r.forEach(m=>{ if(es2025(m.playedAt)) m.playedAt += UN_ANO; }));
+      (t.matches||[]).forEach(m=>{ if(es2025(m.playedAt)) m.playedAt += UN_ANO; });
+      saveTournaments(tournaments);
+    }
+    localStorage.setItem(FLAG, "1");
   })();
 
   showView("home");

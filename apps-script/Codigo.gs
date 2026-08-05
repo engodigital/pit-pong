@@ -61,8 +61,12 @@ function leerTabla_(nombre) {
 }
 
 /**
- * Sustituye todo el contenido de una hoja (menos la cabecera).
- * Se escribe de una sola vez (un setValues) en lugar de fila a fila.
+ * Sustituye el contenido de una hoja (menos la cabecera).
+ *
+ * Escribir en Sheets es lento (segundos por operación), así que primero
+ * comparamos con lo que ya hay: si la tabla no ha cambiado, no se toca.
+ * Guardar el resultado de un partido ya no reescribe la lista de
+ * jugadores ni el resto de tablas.
  */
 function escribirTabla_(nombre, filas) {
   var h = hoja_(nombre);
@@ -70,18 +74,27 @@ function escribirTabla_(nombre, filas) {
   var ultimaCol = h.getLastColumn();
   var cab = h.getRange(1, 1, 1, ultimaCol).getValues()[0];
 
-  if (ultimaFila > 1) {
-    h.getRange(2, 1, ultimaFila - 1, ultimaCol).clearContent();
-  }
-  if (!filas.length) return;
-
-  var matriz = filas.map(function (f) {
+  var matriz = (filas || []).map(function (f) {
     return cab.map(function (col) {
       var v = f[col];
       return (v === undefined || v === null) ? '' : v;
     });
   });
-  h.getRange(2, 1, matriz.length, cab.length).setValues(matriz);
+
+  // ¿Idéntico a lo que ya está escrito? Entonces no hacemos nada.
+  var actual = (ultimaFila > 1)
+    ? h.getRange(2, 1, ultimaFila - 1, ultimaCol).getValues()
+        .filter(function (r) { return String(r[0]).trim() !== ''; })
+    : [];
+  if (JSON.stringify(actual) === JSON.stringify(matriz)) return false;
+
+  if (ultimaFila > 1) {
+    h.getRange(2, 1, ultimaFila - 1, ultimaCol).clearContent();
+  }
+  if (matriz.length) {
+    h.getRange(2, 1, matriz.length, cab.length).setValues(matriz);
+  }
+  return true;
 }
 
 /* ============ Conversión entre el modelo de la app y las hojas ============ */
@@ -182,7 +195,7 @@ function cargarTodo_() {
     return {
       id: id,
       name: String(f.nombre),
-      format: 'liguilla',
+      format: String(f.formato || 'liguilla'),
       status: String(f.estado || 'activo'),
       pointsPerGame: Number(f.puntosPorJuego) || 11,
       setsToWin: Number(f.juegosParaGanar) || 2,
@@ -253,6 +266,7 @@ function guardarTodo_(datos) {
       return {
         id: t.id,
         nombre: t.name,
+        formato: t.format || 'liguilla',
         estado: t.status,
         puntosPorJuego: t.pointsPerGame,
         juegosParaGanar: t.setsToWin,

@@ -368,6 +368,63 @@
   }
   .ganador-box h2{font-size:1.8rem;}
 
+  /* sorteo de moneda */
+  .moneda-overlay{
+    position:fixed;inset:0;z-index:120;
+    background:rgba(26,17,8,.93);
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .moneda-caja{
+    background:var(--crema);
+    border:3px solid var(--dorado);
+    border-radius:var(--radius);
+    padding:22px 20px;
+    text-align:center;
+    max-width:380px;width:100%;
+    box-shadow:var(--shadow);
+  }
+  .moneda-titulo{
+    font-family:"Arial Black","Segoe UI Black",Arial,sans-serif;
+    font-size:1.3rem;color:var(--madera-oscura);text-transform:uppercase;margin-bottom:14px;
+  }
+  .moneda-escena{perspective:800px;display:flex;justify-content:center;margin-bottom:14px;}
+  .moneda{
+    width:130px;height:130px;
+    position:relative;
+    transform-style:preserve-3d;
+    transition:transform 1.6s cubic-bezier(.25,.9,.25,1);
+  }
+  .moneda .cara{
+    position:absolute;inset:0;
+    border-radius:50%;
+    backface-visibility:hidden;
+    -webkit-backface-visibility:hidden;
+    display:flex;align-items:center;justify-content:center;
+    padding:10px;
+    border:5px solid var(--dorado);
+    color:#fff;font-weight:800;font-size:.9rem;line-height:1.15;
+    text-align:center;overflow-wrap:break-word;
+    box-shadow:inset 0 0 14px rgba(0,0,0,.35);
+  }
+  .moneda .cara-a{background:linear-gradient(150deg,var(--verde),var(--verde-oscuro));}
+  .moneda .cara-b{background:linear-gradient(150deg,var(--rojo),#5c1f18);transform:rotateY(180deg);}
+  .moneda-resultado{
+    font-weight:800;color:var(--madera-oscura);min-height:2.6em;
+    /* gap: en flex el espacio entre el texto y el <strong> se colapsa */
+    display:flex;align-items:center;justify-content:center;gap:.35em;
+    font-size:.95rem;flex-wrap:wrap;margin-bottom:10px;
+  }
+  .moneda-resultado strong{color:var(--verde);}
+  @media (orientation:landscape) and (max-height:520px){
+    .moneda-caja{padding:12px 16px;max-width:420px;}
+    .moneda-titulo{font-size:1rem;margin-bottom:8px;}
+    .moneda{width:78px;height:78px;}
+    .moneda .cara{font-size:.7rem;border-width:4px;}
+    .moneda-escena{margin-bottom:8px;}
+    .moneda-resultado{min-height:1.8em;font-size:.85rem;}
+    #btn-lanzar-moneda{font-size:.9rem !important;min-height:40px;}
+  }
+
   /* fotos */
   .galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:12px;}
   .foto-thumb{
@@ -629,6 +686,22 @@
     </div>
     <div id="scorer-ganador" class="oculto" style="margin-top:20px;"></div>
   </main>
+
+  <!-- Sorteo inicial: decide quién saca -->
+  <div id="moneda-overlay" class="moneda-overlay oculto">
+    <div class="moneda-caja">
+      <div class="moneda-titulo">¿Quién saca?</div>
+      <div class="moneda-escena">
+        <div class="moneda" id="moneda">
+          <div class="cara cara-a" id="moneda-cara-a"></div>
+          <div class="cara cara-b" id="moneda-cara-b"></div>
+        </div>
+      </div>
+      <div class="moneda-resultado" id="moneda-resultado"></div>
+      <button class="btn dorado" id="btn-lanzar-moneda" style="width:100%;font-size:1.05rem;">🪙 Lanzar moneda</button>
+      <button class="btn ghost small" id="btn-saltar-moneda" style="margin-top:8px;">Saltar sorteo</button>
+    </div>
+  </div>
 </section>
 
 <!-- ===================== HISTORIAL ===================== -->
@@ -1416,7 +1489,58 @@
       document.getElementById("voice-no-soportada").classList.remove("oculto");
     }
     renderScorer();
+    mostrarSorteoMoneda();
   }
+
+  /* ===================== SORTEO DE MONEDA (quién saca) ===================== */
+  let monedaGiro = 0;
+  let monedaResuelta = false;
+
+  function mostrarSorteoMoneda(){
+    const moneda = document.getElementById("moneda");
+    document.getElementById("moneda-cara-a").textContent = scorerState.a.label;
+    document.getElementById("moneda-cara-b").textContent = scorerState.b.label;
+    document.getElementById("moneda-resultado").textContent = "Lanza la moneda para decidir el saque";
+    const btn = document.getElementById("btn-lanzar-moneda");
+    btn.disabled = false;
+    btn.textContent = "🪙 Lanzar moneda";
+    monedaResuelta = false;
+    // Reposicionamos la moneda sin animar, para que el siguiente giro salga limpio
+    monedaGiro = 0;
+    moneda.style.transition = "none";
+    moneda.style.transform = "rotateY(0deg)";
+    void moneda.offsetWidth;
+    moneda.style.transition = "";
+    document.getElementById("moneda-overlay").classList.remove("oculto");
+  }
+
+  function cerrarSorteoMoneda(){
+    document.getElementById("moneda-overlay").classList.add("oculto");
+  }
+
+  document.getElementById("btn-lanzar-moneda").addEventListener("click", ()=>{
+    if(!scorerState) return;
+    if(monedaResuelta){ cerrarSorteoMoneda(); return; }
+    const btn = document.getElementById("btn-lanzar-moneda");
+    btn.disabled = true;
+    const ganaA = Math.random() < 0.5;
+    monedaGiro += 360*5 + (ganaA ? 0 : 180);
+    document.getElementById("moneda").style.transform = "rotateY("+monedaGiro+"deg)";
+    document.getElementById("moneda-resultado").textContent = "…";
+    setTimeout(()=>{
+      if(!scorerState) return;
+      scorerState.startServer = ganaA ? "a" : "b";
+      renderScorer();
+      const quien = ganaA ? scorerState.a.label : scorerState.b.label;
+      document.getElementById("moneda-resultado").innerHTML = "Saca <strong>"+escapeHtml(quien)+"</strong>";
+      if(navigator.vibrate) navigator.vibrate(60);
+      monedaResuelta = true;
+      btn.disabled = false;
+      btn.textContent = "▶ Empezar partido";
+    }, 1650);
+  });
+
+  document.getElementById("btn-saltar-moneda").addEventListener("click", cerrarSorteoMoneda);
 
   function currentGameScore(){
     let a=0,b=0;

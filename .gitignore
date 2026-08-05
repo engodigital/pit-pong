@@ -10,3 +10,6 @@ Torneo Ping Pong 5 Agosto 2026.jpeg
 PROMPT-NUEVA-SESION.txt
 
 RICERCA-MERCATO.html
+
+# Tests locales (no subir: usan rutas absolutas de esta maquina)
+tests/

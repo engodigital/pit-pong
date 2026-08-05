@@ -387,6 +387,18 @@
   .stats-titulo{font-size:.8rem;font-weight:800;margin:6px 0 6px;opacity:.8;}
   .parciales{font-size:.78em;opacity:.75;font-weight:400;white-space:nowrap;}
 
+  /* Tarjeta del último campeón en la portada */
+  .home-campeon{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--dorado);color:var(--tinta);
+    border-radius:999px;padding:5px 14px 5px 6px;
+    font-size:.85rem;font-weight:700;cursor:pointer;
+    box-shadow:var(--shadow);max-width:100%;
+  }
+  .home-campeon .avatar{border:2px solid var(--madera-oscura);}
+  .ranking-fila-nombre{display:flex;align-items:center;gap:8px;text-align:left;}
+  .ranking-pocos td{opacity:.55;}
+
   /* Sin altura máxima ni scroll propio: dos listas con scroll interno una al
      lado de otra hacían muy difícil desplazar la página con el dedo. */
   .checklist{display:flex;flex-direction:column;gap:6px;padding:4px;}
@@ -837,9 +849,11 @@
         <h1 class="home-title">Pit Pong</h1>
         <div class="home-subtitle">Plataforma de Torneos</div>
         <div class="home-stats" id="home-stats"></div>
+        <div class="home-campeon oculto" id="home-campeon"></div>
         <div class="fila" style="justify-content:center;margin-top:6px;">
           <button class="btn dorado" id="btn-jugar-rapido" style="font-size:1rem;padding:12px 24px;">🏓 Jugar partido</button>
           <button class="btn verde-claro" id="btn-ligas" style="font-size:1rem;padding:12px 24px;">🏅 Ligas</button>
+          <button class="btn madera" id="btn-ranking" style="font-size:1rem;padding:12px 24px;">📊 Ranking</button>
         </div>
       </div>
       <div class="corner-grid">
@@ -1231,6 +1245,18 @@
   </main>
 </section>
 
+<!-- ===================== RANKING DEL CLUB ===================== -->
+<section id="view-ranking" class="view oculto">
+  <main>
+    <div class="card">
+      <h3>📊 Ranking del club</h3>
+      <div class="home-stats">Cuentan todos los partidos: torneos, ligas y partidas sueltas.</div>
+      <div id="ranking-contenido" style="margin-top:10px;"></div>
+      <div class="vacio oculto" id="ranking-vacio">Todavía no hay partidos jugados. ¡El ranking nace con el primero!</div>
+    </div>
+  </main>
+</section>
+
 <div id="lightbox-container"></div>
 
 <script>
@@ -1486,6 +1512,7 @@
   function refrescarVistaActual(){
     if(currentView === "home") renderHome();
     else if(currentView === "jugadores") renderJugadores();
+    else if(currentView === "ranking") renderRanking();
     else if(currentView === "continuar") renderContinuar();
     else if(currentView === "historial") renderHistorial();
     else if(currentView === "bracket" && currentBracketId && getTournament(currentBracketId)) renderBracket(currentBracketId);
@@ -1607,6 +1634,7 @@
       } else { showView("historial"); return; }
     }
     if(name === "jugar-rapido") renderJugarRapido();
+    if(name === "ranking") renderRanking();
     if(name === "ligas") renderLigas();
     if(name === "crear-liga") renderCrearLiga();
     if(name === "liga"){
@@ -1627,6 +1655,7 @@
   });
 
   document.getElementById("btn-jugadores").addEventListener("click", ()=>showView("jugadores",{titulo:"Añadir jugadores"}));
+  document.getElementById("btn-ranking").addEventListener("click", ()=>showView("ranking",{titulo:"Ranking del club"}));
   document.getElementById("btn-crear").addEventListener("click", ()=>showView("crear",{titulo:"Crear torneo"}));
   document.getElementById("btn-continuar").addEventListener("click", ()=>showView("continuar",{titulo:"Continuar torneo"}));
   document.getElementById("btn-historial").addEventListener("click", ()=>showView("historial",{titulo:"Historial y fotos"}));
@@ -1634,8 +1663,83 @@
   function renderHome(){
     const activos = tournaments.filter(t=>t.status==="activo").length;
     const finalizados = tournaments.filter(t=>t.status==="finalizado").length;
+
+    // Partidos jugados hoy (torneos, ligas y sueltos) — el pulso del club.
+    const hoy0 = new Date().setHours(0,0,0,0);
+    let deHoy = 0;
+    tournaments.forEach(t=>{
+      const listas = [];
+      if(t.matches && t.matches.length) listas.push(t.matches);
+      (t.rounds||[]).forEach(r=>listas.push(r));
+      listas.forEach(l=>l.forEach(m=>{ if(m.winner && m.playedAt && m.playedAt >= hoy0) deHoy++; }));
+    });
+    partidosSueltos.forEach(p=>{ if(p.playedAt && p.playedAt >= hoy0) deHoy++; });
+
     document.getElementById("home-stats").textContent =
-      players.length + " jugadores · " + activos + " torneo(s) en curso · " + finalizados + " finalizados";
+      players.length + " jugadores · " + activos + " torneo(s) en curso · " + finalizados + " finalizados" +
+      (deHoy ? " · " + deHoy + " partido(s) hoy" : "");
+
+    // Campeón del torneo más reciente, visible nada más encender el iPad.
+    const conCampeon = tournaments.filter(t=>t.champion && t.status==="finalizado")
+      .sort((a,b)=>(b.finishedAt||b.createdAt||0)-(a.finishedAt||a.createdAt||0));
+    const chip = document.getElementById("home-campeon");
+    if(conCampeon.length){
+      const t = conCampeon[0];
+      chip.classList.remove("oculto");
+      chip.innerHTML = avatarHtml(t.champion, 30) +
+        '<span>🏆 Último campeón: <strong>'+escapeHtml(playerName(t.champion))+'</strong> · '+escapeHtml(t.name)+'</span>';
+      chip.onclick = ()=>{ currentHistorialId = t.id; showView("detalle-historial", {titulo: t.name}); };
+    } else {
+      chip.classList.add("oculto");
+    }
+  }
+
+  /* ===================== RANKING DEL CLUB ===================== */
+  // Clasificación general con TODOS los partidos (torneos, ligas y sueltos).
+  // Con menos de MIN_PARTIDOS no se entra: un 1 de 1 no puede liderar nada.
+  const MIN_PARTIDOS_RANKING = 2;
+  function renderRanking(){
+    const cont = document.getElementById("ranking-contenido");
+    const vacio = document.getElementById("ranking-vacio");
+    const filas = players.map(p=>{
+      const partidos = partidosDeJugador(p.id);
+      const pj = partidos.length;
+      const pg = partidos.filter(x=>x.gano).length;
+      return {id:p.id, pj, pg, pp:pj-pg, pct: pj ? Math.round(pg*100/pj) : 0};
+    });
+    const nombre = f => playerName(f.id);
+    const clasificados = filas.filter(f=>f.pj >= MIN_PARTIDOS_RANKING)
+      .sort((a,b)=> b.pct-a.pct || b.pg-a.pg || a.pj-b.pj || nombre(a).localeCompare(nombre(b),"es"));
+    const pocos = filas.filter(f=>f.pj > 0 && f.pj < MIN_PARTIDOS_RANKING)
+      .sort((a,b)=> b.pj-a.pj || nombre(a).localeCompare(nombre(b),"es"));
+    const sinJugar = filas.filter(f=>f.pj === 0);
+
+    const hayAlgo = clasificados.length > 0 || pocos.length > 0;
+    vacio.classList.toggle("oculto", hayAlgo);
+    cont.innerHTML = "";
+    if(!hayAlgo) return;
+
+    const medallas = ["🥇","🥈","🥉"];
+    const celda = f =>
+      '<td class="col-nombre"><span class="ranking-fila-nombre">'+avatarHtml(f.id,26)+
+      '<span>'+escapeHtml(nombre(f))+'</span></span></td>'+
+      '<td>'+f.pj+'</td><td><strong>'+f.pg+'</strong></td><td>'+f.pp+'</td><td>'+f.pct+'%</td>';
+    let html = '<div class="tabla-wrap"><table class="tabla-clasif">'+
+      '<thead><tr><th>#</th><th>Jugador</th><th>PJ</th><th>PG</th><th>PP</th><th>%V</th></tr></thead><tbody>';
+    clasificados.forEach((f,i)=>{
+      html += '<tr'+(i===0?' class="fila-campeon"':'')+'><td>'+(medallas[i]||(i+1))+'</td>'+celda(f)+'</tr>';
+    });
+    pocos.forEach(f=>{
+      html += '<tr class="ranking-pocos"><td>—</td>'+celda(f)+'</tr>';
+    });
+    html += '</tbody></table></div>';
+    if(pocos.length){
+      html += '<div class="home-stats" style="margin-top:8px;">Con menos de '+MIN_PARTIDOS_RANKING+' partidos todavía no se entra en el ranking.</div>';
+    }
+    if(sinJugar.length){
+      html += '<div class="home-stats">Sin estrenar: '+sinJugar.map(f=>escapeHtml(nombre(f))).join(", ")+'</div>';
+    }
+    cont.innerHTML = html;
   }
 
   /* ===================== JUGADORES ===================== */

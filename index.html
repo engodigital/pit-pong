@@ -387,6 +387,23 @@
   .stats-titulo{font-size:.8rem;font-weight:800;margin:6px 0 6px;opacity:.8;}
   .parciales{font-size:.78em;opacity:.75;font-weight:400;white-space:nowrap;}
 
+  /* Aviso de "red" (let): mensaje + luz parpadeante, no toca el marcador */
+  .net-aviso{
+    position:fixed;left:50%;top:14%;transform:translateX(-50%);
+    z-index:500;cursor:pointer;
+    background:var(--dorado);color:var(--tinta);
+    border:4px solid var(--madera-oscura);border-radius:18px;
+    padding:18px 32px;text-align:center;
+    font-size:clamp(1.4rem,4vw,2.2rem);font-weight:800;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+    animation:parpadeo-net .5s ease-in-out infinite alternate;
+  }
+  .net-aviso span{display:block;font-size:.5em;font-weight:700;margin-top:4px;}
+  @keyframes parpadeo-net{
+    from{ background:var(--dorado); box-shadow:0 8px 30px rgba(0,0,0,.35); }
+    to{ background:#fff3d6; box-shadow:0 8px 46px 6px rgba(194,140,66,.85); }
+  }
+
   /* Tarjeta del último campeón en la portada */
   .home-campeon{
     display:flex;align-items:center;justify-content:center;gap:8px;
@@ -1196,6 +1213,11 @@
     <div class="regla-saque" id="regla-saque"></div>
     <div class="juegos-log" id="juegos-log"></div>
 
+    <div class="check-item marcado" id="check-anuncio-saque" style="margin-bottom:10px;">
+      <span class="caja-check activa" id="caja-anuncio-saque">✓</span>
+      <span>🔊 Anunciar el saque en voz (para no mirar la pantalla)</span>
+    </div>
+
     <div class="voice-box" id="voice-box">
       <button class="btn azul" id="btn-voz" style="width:100%;">🎤 Activar marcador por voz</button>
       <div class="voice-estado" id="voice-estado">Di el nombre del jugador para sumarle el punto — necesita micrófono y conexión a internet.</div>
@@ -1207,9 +1229,11 @@
     <div class="scorer-acciones">
       <button class="btn ghost" id="btn-deshacer">↩️ Deshacer último punto</button>
       <button class="btn madera" id="btn-cambiar-campo">🔄 Cambiar de campo</button>
+      <button class="btn azul" id="btn-net">🌐 Red (repetir punto)</button>
       <button class="btn rojo" id="btn-cancelar-partido">Cancelar partido</button>
     </div>
     <div id="scorer-ganador" class="oculto" style="margin-top:20px;"></div>
+    <div class="net-aviso oculto" id="net-aviso">🌐 ¡RED!<br><span>Se repite el punto</span></div>
   </main>
 
   <!-- Sorteo inicial: decide quién saca -->
@@ -1642,6 +1666,7 @@
   function showView(name, opts){
     opts = opts || {};
     if(name !== "scorer" && typeof vozActiva !== "undefined" && vozActiva){ detenerVoz(); }
+    if(name !== "scorer" && "speechSynthesis" in window){ speechSynthesis.cancel(); }
     document.querySelectorAll(".view").forEach(v => v.classList.add("oculto"));
     const el = document.getElementById("view-" + name);
     if(el) el.classList.remove("oculto");
@@ -2883,9 +2908,33 @@
       document.getElementById("voice-box").classList.add("oculto");
       document.getElementById("voice-no-soportada").classList.remove("oculto");
     }
+    ocultarAvisoNet();
+    // Partido nuevo: que anuncie el primer saque, no lo silencie por "ya
+    // anunciamos a fulano" del partido anterior.
+    ultimoServidorAnunciado = null;
+    document.getElementById("check-anuncio-saque").classList.toggle(
+      "oculto", !("speechSynthesis" in window));
     renderScorer();
     mostrarSorteoMoneda();
   }
+
+  /* ===================== AVISO DE RED (let) ===================== */
+  // Solo visual/vibración: nunca toca el marcador, es una señal para
+  // repetir el punto sin tener que gritarlo desde el otro lado de la mesa.
+  let netTimeout = null;
+  function mostrarAvisoNet(){
+    const el = document.getElementById("net-aviso");
+    el.classList.remove("oculto");
+    if(navigator.vibrate) navigator.vibrate([120,80,120,80,120]);
+    clearTimeout(netTimeout);
+    netTimeout = setTimeout(ocultarAvisoNet, 4000);
+  }
+  function ocultarAvisoNet(){
+    document.getElementById("net-aviso").classList.add("oculto");
+    clearTimeout(netTimeout);
+  }
+  document.getElementById("btn-net").addEventListener("click", mostrarAvisoNet);
+  document.getElementById("net-aviso").addEventListener("click", ocultarAvisoNet);
 
   /* ===================== LIGAS (clasificación permanente) =====================
      Una liga es como una liguilla pero SIN calendario: no hay jornadas ni
@@ -3284,6 +3333,7 @@
     document.getElementById("puntos-a").textContent = puntos[izq];
     document.getElementById("puntos-b").textContent = puntos[der];
     const server = currentServer();
+    anunciarSaque(server);
     document.getElementById("sirve-a").classList.toggle("oculto", server!==izq);
     document.getElementById("sirve-b").classList.toggle("oculto", server!==der);
     document.getElementById("panel-a").classList.toggle("sirve", server===izq);
@@ -3341,6 +3391,43 @@
   let vozCooldown = false;
   let indicesPuntuados = new Set();
 
+  /* ===================== ANUNCIO DE SAQUE (texto a voz) ===================== */
+  // Distinto del "marcador por voz" de arriba: aquello ESCUCHA (quién ganó
+  // el punto); esto HABLA (quién saca), para poder jugar sin mirar la
+  // pantalla. Son compatibles pero pueden pisarse: si el altavoz dice
+  // "Saca Marco" con el micrófono activo, el reconocimiento podría oír su
+  // propio nombre y sumarle un punto por error. Lo evitamos silenciando el
+  // reconocimiento (sin pararlo, para no perder el siguiente punto real)
+  // mientras dura el anuncio.
+  let anuncioSaqueActivo = true;
+  let ultimoServidorAnunciado = null;
+  let pausarVozPorAnuncio = false;
+
+  function anunciarSaque(server){
+    if(!anuncioSaqueActivo || !scorerState) return;
+    if(!("speechSynthesis" in window)) return;
+    if(server === ultimoServidorAnunciado) return;
+    ultimoServidorAnunciado = server;
+    const nombre = scorerState[server].label;
+    speechSynthesis.cancel(); // corta un anuncio anterior si aún sonaba
+    const utter = new SpeechSynthesisUtterance("Saca " + nombre);
+    utter.lang = "es-ES";
+    utter.rate = 0.95;
+    pausarVozPorAnuncio = true;
+    utter.onend = utter.onerror = ()=>{ pausarVozPorAnuncio = false; };
+    speechSynthesis.speak(utter);
+  }
+
+  document.getElementById("check-anuncio-saque").addEventListener("click", ()=>{
+    anuncioSaqueActivo = !anuncioSaqueActivo;
+    if(!anuncioSaqueActivo) speechSynthesis.cancel();
+    const item = document.getElementById("check-anuncio-saque");
+    const caja = document.getElementById("caja-anuncio-saque");
+    item.classList.toggle("marcado", anuncioSaqueActivo);
+    caja.classList.toggle("activa", anuncioSaqueActivo);
+    caja.textContent = anuncioSaqueActivo ? "✓" : "";
+  });
+
   function soportaVoz(){
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   }
@@ -3374,7 +3461,9 @@
     recognition.maxAlternatives = 3;
 
     recognition.onresult = (event)=>{
-      if(!scorerState || vozCooldown) return;
+      // No procesar mientras suena "Saca Fulano": si no, el propio altavoz
+      // podría hacer que el micrófono se apunte un punto solo.
+      if(!scorerState || vozCooldown || pausarVozPorAnuncio) return;
       for(let i = event.resultIndex; i < event.results.length; i++){
         if(indicesPuntuados.has(i)) continue;   // ya sumamos por esta frase
         const res = event.results[i];

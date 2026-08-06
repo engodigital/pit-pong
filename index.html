@@ -399,6 +399,26 @@
   .ranking-fila-nombre{display:flex;align-items:center;gap:8px;text-align:left;}
   .ranking-pocos td{opacity:.55;}
 
+  /* Insignia con la posición del ranking del club, junto al nombre */
+  .pos-atp{
+    display:inline-block;font-size:.72em;font-weight:800;line-height:1.2;
+    color:var(--madera-oscura);background:var(--crema);
+    border:1px solid var(--madera);border-radius:999px;
+    padding:1px 7px;margin-left:5px;vertical-align:middle;white-space:nowrap;
+  }
+  .fila-campeon .pos-atp{background:#fff8ec;}
+
+  /* Resultados del detalle del historial: legibles desde lejos, sin
+     desperdiciar la tarjeta en texto pequeño. */
+  .detalle-partidos{
+    font-size:clamp(1.05rem, 1.8vw, 1.25rem);
+    line-height:1.9;
+  }
+  .detalle-partidos strong{
+    display:block;margin-top:10px;
+    font-size:1.06em;color:var(--madera-oscura);
+  }
+
   /* Sin altura máxima ni scroll propio: dos listas con scroll interno una al
      lado de otra hacían muy difícil desplazar la página con el dedo. */
   .checklist{display:flex;flex-direction:column;gap:6px;padding:4px;}
@@ -943,6 +963,11 @@
       <div class="checklist" id="checklist-jugadores"></div>
       <div class="vacio oculto" id="checklist-vacio">No hay jugadores todavía — añade jugadores primero.</div>
       <div class="home-stats" id="seleccion-info" style="margin-top:10px;"></div>
+      <label style="margin-top:10px;">¿Falta alguien? Añádelo aquí (entra ya seleccionado)</label>
+      <div class="fila">
+        <input type="text" id="input-jugador-torneo" placeholder="Nombre del jugador nuevo" maxlength="30" style="flex:1;min-width:180px;width:auto;">
+        <button class="btn" id="btn-add-jugador-torneo">+ Añadir</button>
+      </div>
     </div>
     <button class="btn dorado" id="btn-generar-torneo" style="width:100%;font-size:1.05rem;">🏆 Generar cuadro y crear torneo</button>
   </main>
@@ -1073,6 +1098,11 @@
       <div class="checklist" id="checklist-liga"></div>
       <div class="vacio oculto" id="checklist-liga-vacio">No hay jugadores todavía — añádelos primero.</div>
       <div class="home-stats" id="seleccion-liga-info" style="margin-top:10px;"></div>
+      <label style="margin-top:10px;">¿Falta alguien? Añádelo aquí (entra ya seleccionado)</label>
+      <div class="fila">
+        <input type="text" id="input-jugador-liga" placeholder="Nombre del jugador nuevo" maxlength="30" style="flex:1;min-width:180px;width:auto;">
+        <button class="btn" id="btn-add-jugador-liga">+ Añadir</button>
+      </div>
     </div>
     <button class="btn dorado" id="btn-generar-liga" style="width:100%;font-size:1.05rem;">🏅 Crear liga</button>
   </main>
@@ -1269,15 +1299,31 @@
   const LS_PARTIDOS_SUELTOS = "pitpong_partidos_sueltos";
 
   function loadPlayers(){ try{ return JSON.parse(localStorage.getItem(LS_PLAYERS)) || []; }catch(e){ return []; } }
-  function savePlayers(arr){ localStorage.setItem(LS_PLAYERS, JSON.stringify(arr)); programarSync(); }
+  function savePlayers(arr){ localStorage.setItem(LS_PLAYERS, JSON.stringify(arr)); _rankCache = null; programarSync(); }
   function loadTournaments(){ try{ return JSON.parse(localStorage.getItem(LS_TOURNAMENTS)) || []; }catch(e){ return []; } }
-  function saveTournaments(arr){ localStorage.setItem(LS_TOURNAMENTS, JSON.stringify(arr)); programarSync(); }
+  function saveTournaments(arr){ localStorage.setItem(LS_TOURNAMENTS, JSON.stringify(arr)); _rankCache = null; programarSync(); }
   function loadPartidosSueltos(){ try{ return JSON.parse(localStorage.getItem(LS_PARTIDOS_SUELTOS)) || []; }catch(e){ return []; } }
-  function savePartidosSueltos(arr){ localStorage.setItem(LS_PARTIDOS_SUELTOS, JSON.stringify(arr)); programarSync(); }
+  function savePartidosSueltos(arr){ localStorage.setItem(LS_PARTIDOS_SUELTOS, JSON.stringify(arr)); _rankCache = null; programarSync(); }
 
   let players = loadPlayers();
   let tournaments = loadTournaments();
   let partidosSueltos = loadPartidosSueltos();
+
+  // Posiciones del ranking del club, cacheadas: se invalidan en cada save*
+  // (cualquier cambio de datos pasa por ahí) y se recalculan al primer uso.
+  let _rankCache = null;
+  function posicionClub(id){
+    if(!_rankCache){
+      _rankCache = {};
+      calcularFilasRanking().conActividad.forEach((f,i)=>{ _rankCache[f.id] = i+1; });
+    }
+    return _rankCache[id] || null;
+  }
+  // Nombre + insignia "#pos" para pintar junto a cada jugador en las listas.
+  function nombreConPos(id){
+    const pos = posicionClub(id);
+    return escapeHtml(playerName(id)) + (pos ? ' <span class="pos-atp">#'+pos+'</span>' : '');
+  }
 
   /* ===================== SINCRONIZACIÓN ONLINE (Google Sheets) =====================
      Pega aquí la URL /exec de la Web App de Apps Script. Si se deja vacía,
@@ -1559,7 +1605,7 @@
   // Línea de resultado de un partido de torneo para el detalle del historial:
   // "Marco 0 - 2 Ángel (5-11, 8-11) · 05 ago 2026"
   function lineaPartidoHistorial(m, sinResultado){
-    let linea = escapeHtml(playerName(m.a)) + " " + (m.scoreLabel||sinResultado) + " " + escapeHtml(playerName(m.b));
+    let linea = nombreConPos(m.a) + " " + (m.scoreLabel||sinResultado) + " " + nombreConPos(m.b);
     const parc = parcialesLabel(m.sets);
     if(parc) linea += ' <span class="parciales">('+parc+')</span>';
     if(m.playedAt) linea += ' <span class="parciales">· '+formatDate(m.playedAt)+'</span>';
@@ -1732,9 +1778,8 @@
     return med;
   }
 
-  function renderRanking(){
-    const cont = document.getElementById("ranking-contenido");
-    const vacio = document.getElementById("ranking-vacio");
+  // Estilo ATP: mandan las medallas de torneo; a igualdad, las victorias.
+  function calcularFilasRanking(){
     const medallero = medalleroClub();
     const filas = players.map(p=>{
       const partidos = partidosDeJugador(p.id);
@@ -1745,12 +1790,19 @@
               oro:m.oro, plata:m.plata, bronce:m.bronce};
     });
     const nombre = f => playerName(f.id);
-    // Estilo ATP: mandan las medallas de torneo; a igualdad, las victorias.
     const conActividad = filas.filter(f=>f.pj > 0 || f.oro || f.plata || f.bronce)
       .sort((a,b)=> b.oro-a.oro || b.plata-a.plata || b.bronce-a.bronce ||
                     b.pg-a.pg || b.pct-a.pct || a.pj-b.pj ||
                     nombre(a).localeCompare(nombre(b),"es"));
     const sinJugar = filas.filter(f=>f.pj === 0 && !f.oro && !f.plata && !f.bronce);
+    return {conActividad, sinJugar};
+  }
+
+  function renderRanking(){
+    const cont = document.getElementById("ranking-contenido");
+    const vacio = document.getElementById("ranking-vacio");
+    const {conActividad, sinJugar} = calcularFilasRanking();
+    const nombre = f => playerName(f.id);
 
     vacio.classList.toggle("oculto", conActividad.length > 0);
     cont.innerHTML = "";
@@ -1937,7 +1989,7 @@
           '<button class="avatar-boton" data-foto="'+p.id+'" title="Cambiar foto">'+
             avatarHtml(p.id, 44)+'<span class="avatar-camara">📷</span>'+
           '</button>'+
-          '<div class="jugador-nombre">'+escapeHtml(p.name)+'</div>'+
+          '<div class="jugador-nombre">'+nombreConPos(p.id)+'</div>'+
           '<button class="btn small'+(statsJugadorId===p.id?' dorado':'')+'" data-stats="'+p.id+'">📊</button>'+
           (p.photo ? '<button class="btn ghost small" data-quitar-foto="'+p.id+'">Quitar foto</button>' : '')+
           '<button class="btn madera small" data-editar="'+p.id+'">Editar</button>'+
@@ -2068,6 +2120,32 @@
       .forEach(b=>b.classList.toggle("activo", b.dataset.saque===String(valor)));
   }
 
+  // La checklist se repinta sola conservando la selección: hace falta al
+  // añadir un jugador nuevo sin perder los ya marcados.
+  function pintarChecklistCrear(){
+    const cont = document.getElementById("checklist-jugadores");
+    const vacio = document.getElementById("checklist-vacio");
+    cont.innerHTML = "";
+    if(players.length===0){ vacio.classList.remove("oculto"); }
+    else vacio.classList.add("oculto");
+    players.forEach(p=>{
+      const marcado = seleccionados.has(p.id);
+      const item = document.createElement("label");
+      item.className = "check-item" + (marcado ? " marcado" : "");
+      item.innerHTML =
+        '<input type="checkbox" data-pid="'+p.id+'"'+(marcado ? " checked" : "")+'>'+
+        avatarHtml(p.id, 30)+
+        '<span>'+nombreConPos(p.id)+'</span>';
+      cont.appendChild(item);
+      const cb = item.querySelector("input");
+      cb.addEventListener("change", ()=>{
+        if(cb.checked){ seleccionados.add(p.id); item.classList.add("marcado"); }
+        else { seleccionados.delete(p.id); item.classList.remove("marcado"); }
+        actualizaSeleccionInfo();
+      });
+    });
+  }
+
   function renderCrear(){
     seleccionados = new Set();
     saqueTorneo = 3;
@@ -2077,28 +2155,26 @@
     document.getElementById("input-nombre-torneo").value = "";
     document.getElementById("input-puntos-juego").value = 11;
     document.getElementById("input-sets").value = "2";
-    const cont = document.getElementById("checklist-jugadores");
-    const vacio = document.getElementById("checklist-vacio");
-    cont.innerHTML = "";
-    if(players.length===0){ vacio.classList.remove("oculto"); }
-    else vacio.classList.add("oculto");
-    players.forEach(p=>{
-      const item = document.createElement("label");
-      item.className = "check-item";
-      item.innerHTML =
-        '<input type="checkbox" data-pid="'+p.id+'">'+
-        avatarHtml(p.id, 30)+
-        '<span>'+escapeHtml(p.name)+'</span>';
-      cont.appendChild(item);
-      const cb = item.querySelector("input");
-      cb.addEventListener("change", ()=>{
-        if(cb.checked){ seleccionados.add(p.id); item.classList.add("marcado"); }
-        else { seleccionados.delete(p.id); item.classList.remove("marcado"); }
-        actualizaSeleccionInfo();
-      });
-    });
+    document.getElementById("input-jugador-torneo").value = "";
+    pintarChecklistCrear();
     document.getElementById("check-todos").checked = false;
     document.getElementById("check-todos-wrap").classList.remove("marcado");
+    actualizaSeleccionInfo();
+  }
+
+  document.getElementById("btn-add-jugador-torneo").addEventListener("click", addJugadorTorneo);
+  document.getElementById("input-jugador-torneo").addEventListener("keydown", e=>{ if(e.key==="Enter") addJugadorTorneo(); });
+  function addJugadorTorneo(){
+    const input = document.getElementById("input-jugador-torneo");
+    const nuevo = crearJugadorNuevo(input.value);
+    if(!nuevo){
+      if(input.value.trim()) input.select();
+      return;
+    }
+    input.value = "";
+    // Si lo añades desde aquí es porque va a jugar: entra ya seleccionado.
+    seleccionados.add(nuevo.id);
+    pintarChecklistCrear();
     actualizaSeleccionInfo();
   }
   function actualizaSeleccionInfo(){
@@ -2262,7 +2338,7 @@
     item.innerHTML =
       '<span class="caja-check'+(marcado?" activa":"")+'">'+(marcado?"✓":"")+'</span>'+
       avatarHtml(p.id, 30)+
-      '<span>'+escapeHtml(p.name)+'</span>';
+      '<span>'+nombreConPos(p.id)+'</span>';
     if(!enOtro){
       item.addEventListener("click", ()=>toggleSeleccionRapida(lado, p.id));
     }
@@ -2664,9 +2740,9 @@
     const claseA = m.winner ? (m.winner===m.a ? "ganador" : "perdedor") : "";
     const claseB = m.winner ? (m.winner===m.b ? "ganador" : "perdedor") : "";
     let html =
-      '<div class="match-jugador '+claseA+'"><span>'+escapeHtml(playerName(m.a))+'</span></div>'+
+      '<div class="match-jugador '+claseA+'"><span>'+nombreConPos(m.a)+'</span></div>'+
       '<div class="match-vs">vs</div>'+
-      '<div class="match-jugador '+claseB+'"><span>'+escapeHtml(playerName(m.b))+'</span></div>';
+      '<div class="match-jugador '+claseB+'"><span>'+nombreConPos(m.b)+'</span></div>';
     if(m.winner){
       const parc = parcialesLabel(m.sets);
       html += '<div class="match-estado">'+escapeHtml(m.scoreLabel)+
@@ -2704,9 +2780,9 @@
     const claseA = m.winner ? (m.winner===m.a ? "ganador" : "perdedor") : "";
     const claseB = m.winner ? (m.winner===m.b ? "ganador" : "perdedor") : "";
     let html = "";
-    html += '<div class="match-jugador '+claseA+'"><span>'+(m.a?escapeHtml(playerName(m.a)):"—")+'</span></div>';
+    html += '<div class="match-jugador '+claseA+'"><span>'+(m.a?nombreConPos(m.a):"—")+'</span></div>';
     html += '<div class="match-vs">vs</div>';
-    html += '<div class="match-jugador '+claseB+'"><span>'+(m.b?escapeHtml(playerName(m.b)):"—")+'</span></div>';
+    html += '<div class="match-jugador '+claseB+'"><span>'+(m.b?nombreConPos(m.b):"—")+'</span></div>';
     if(m.scoreLabel){
       const parc = parcialesLabel(m.sets);
       html += '<div class="match-estado">'+escapeHtml(m.scoreLabel)+
@@ -2868,6 +2944,7 @@
     ventajaLiga = true;
     document.getElementById("input-nombre-liga").value = "";
     document.getElementById("input-sets-liga").value = "2";
+    document.getElementById("input-jugador-liga").value = "";
     document.querySelectorAll("#toggle-puntos-liga .toggle-opcion")
       .forEach(b=>b.classList.toggle("activo", b.dataset.puntos==="11"));
     pintarToggleSaque("toggle-saque-liga", saqueLiga);
@@ -2885,7 +2962,7 @@
       item.className = "check-item" + (marcado?" marcado":"");
       item.innerHTML =
         '<span class="caja-check'+(marcado?" activa":"")+'">'+(marcado?"✓":"")+'</span>'+
-        avatarHtml(p.id, 30)+'<span>'+escapeHtml(p.name)+'</span>';
+        avatarHtml(p.id, 30)+'<span>'+nombreConPos(p.id)+'</span>';
       item.addEventListener("click", ()=>{
         if(seleccionLiga.has(p.id)) seleccionLiga.delete(p.id); else seleccionLiga.add(p.id);
         renderChecklistLiga();
@@ -2906,6 +2983,19 @@
     seleccionLiga = new Set(todos ? [] : players.map(p=>p.id));
     renderChecklistLiga();
   });
+  document.getElementById("btn-add-jugador-liga").addEventListener("click", addJugadorLiga);
+  document.getElementById("input-jugador-liga").addEventListener("keydown", e=>{ if(e.key==="Enter") addJugadorLiga(); });
+  function addJugadorLiga(){
+    const input = document.getElementById("input-jugador-liga");
+    const nuevo = crearJugadorNuevo(input.value);
+    if(!nuevo){
+      if(input.value.trim()) input.select();
+      return;
+    }
+    input.value = "";
+    seleccionLiga.add(nuevo.id);
+    renderChecklistLiga();
+  }
   document.querySelectorAll("#toggle-puntos-liga .toggle-opcion").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       puntosLiga = parseInt(btn.dataset.puntos,10);
@@ -2985,7 +3075,7 @@
       div.className = "jugador-item";
       const parc = parcialesLabel(m.sets);
       div.innerHTML =
-        '<div class="jugador-nombre">'+escapeHtml(playerName(m.a))+' vs '+escapeHtml(playerName(m.b))+
+        '<div class="jugador-nombre">'+nombreConPos(m.a)+' vs '+nombreConPos(m.b)+
           (m.playedAt ? ' <span class="parciales">'+formatDate(m.playedAt)+'</span>' : '')+'</div>'+
         '<div class="campeon-tag" style="margin:0;">'+escapeHtml(playerName(m.winner))+' '+escapeHtml(m.scoreLabel||"")+
           (parc ? ' <span class="parciales">('+parc+')</span>' : '')+'</div>';
@@ -3030,7 +3120,7 @@
         item.className = "check-item" + (marcado?" marcado":"") + (enOtro?" deshabilitado":"");
         item.innerHTML =
           '<span class="caja-check'+(marcado?" activa":"")+'">'+(marcado?"✓":"")+'</span>'+
-          avatarHtml(id, 30)+'<span>'+escapeHtml(playerName(id))+'</span>';
+          avatarHtml(id, 30)+'<span>'+nombreConPos(id)+'</span>';
         if(!enOtro){
           item.addEventListener("click", ()=>{
             const arr = lado==="a" ? ligaSelA : ligaSelB;
@@ -3564,7 +3654,7 @@
         for(let j=1;j<=t.numJornadas;j++){
           const deJornada = t.matches.filter(m=>m.jornada===j);
           if(!deJornada.length) continue;
-          bracketResumen += "<strong>Jornada "+j+":</strong><br>";
+          bracketResumen += "<strong>Jornada "+j+":</strong>";
           deJornada.forEach(m=>{
             bracketResumen += lineaPartidoHistorial(m, "—");
           });
@@ -3572,7 +3662,7 @@
       } else {
         t.rounds.forEach((round,rIdx)=>{
           const nombres = numRoundsToNames(t.rounds.length);
-          bracketResumen += "<strong>"+nombres[rIdx]+":</strong><br>";
+          bracketResumen += "<strong>"+nombres[rIdx]+":</strong>";
           round.forEach(m=>{
             if(m.a || m.b){
               bracketResumen += lineaPartidoHistorial(m, "?");
@@ -3584,7 +3674,7 @@
         (reciénFinalizado ? '<div class="ganador-box" style="margin-bottom:14px;"><h2>🏆 ¡Torneo finalizado!</h2><div>Campeón: '+escapeHtml(playerName(t.champion))+' — añade aquí abajo el book de fotos.</div></div>' : '')+
         '<h3>'+escapeHtml(t.name)+'</h3>'+
         (t.status==="finalizado" ? '<div class="campeon-tag">🏆 Campeón: '+escapeHtml(playerName(t.champion))+'</div>' : '<div class="home-stats">Torneo en curso</div>')+
-        '<div style="margin-top:10px;font-size:.85rem;line-height:1.6;">'+bracketResumen+'</div>';
+        '<div class="detalle-partidos" style="margin-top:10px;">'+bracketResumen+'</div>';
     } else {
       const p = reg.obj;
       const nombreA = p.equipoA.map(playerName).join(" + ");
@@ -3594,7 +3684,8 @@
         (reciénFinalizado ? '<div class="ganador-box" style="margin-bottom:14px;"><h2>🏆 ¡Partido guardado!</h2><div>Ganador: '+escapeHtml(ganadorLabel)+' — añade aquí abajo alguna foto si quieres.</div></div>' : '')+
         '<h3>'+escapeHtml(nombreA)+' vs '+escapeHtml(nombreB)+'</h3>'+
         '<div class="home-stats">Partida suelta ('+(p.modo||"1vs1")+') · '+formatDate(p.playedAt)+'</div>'+
-        '<div class="campeon-tag">🏆 '+escapeHtml(ganadorLabel)+' — '+escapeHtml(p.scoreLabel)+'</div>';
+        '<div class="campeon-tag">🏆 '+escapeHtml(ganadorLabel)+' — '+escapeHtml(p.scoreLabel)+
+          (parcialesLabel(p.games) ? ' <span class="parciales">('+parcialesLabel(p.games)+')</span>' : '')+'</div>';
     }
     renderGaleria(reg);
   }

@@ -678,6 +678,7 @@
     font-size:.95rem;flex-wrap:wrap;margin-bottom:10px;
   }
   .moneda-resultado strong{color:var(--verde);}
+  .moneda-manual-titulo{font-size:.72rem;opacity:.75;margin:12px 0 8px;}
   @media (orientation:landscape) and (max-height:520px){
     .moneda-caja{padding:12px 16px;max-width:420px;}
     .moneda-titulo{font-size:1rem;margin-bottom:8px;}
@@ -686,6 +687,7 @@
     .moneda-escena{margin-bottom:8px;}
     .moneda-resultado{min-height:1.8em;font-size:.85rem;}
     #btn-lanzar-moneda{font-size:.9rem !important;min-height:40px;}
+    .moneda-manual-titulo{margin:8px 0 6px;}
   }
 
   /* fotos */
@@ -1248,6 +1250,9 @@
       </div>
       <div class="moneda-resultado" id="moneda-resultado"></div>
       <button class="btn dorado" id="btn-lanzar-moneda" style="width:100%;font-size:1.05rem;">🪙 Lanzar moneda</button>
+      <div class="moneda-manual-titulo">— o decidid con una pelota y elegid aquí quién saca —</div>
+      <button class="btn verde-claro" id="btn-elegir-a" style="width:100%;">🏓 Empieza sacando <span id="elegir-nombre-a"></span></button>
+      <button class="btn madera" id="btn-elegir-b" style="width:100%;margin-top:8px;">🏓 Empieza sacando <span id="elegir-nombre-b"></span></button>
       <button class="btn ghost small" id="btn-saltar-moneda" style="margin-top:8px;">Saltar sorteo</button>
     </div>
   </div>
@@ -3237,6 +3242,8 @@
     const moneda = document.getElementById("moneda");
     document.getElementById("moneda-cara-a").textContent = scorerState.a.label;
     document.getElementById("moneda-cara-b").textContent = scorerState.b.label;
+    document.getElementById("elegir-nombre-a").textContent = scorerState.a.label;
+    document.getElementById("elegir-nombre-b").textContent = scorerState.b.label;
     document.getElementById("moneda-resultado").textContent = "Lanza la moneda para decidir el saque";
     const btn = document.getElementById("btn-lanzar-moneda");
     btn.disabled = false;
@@ -3278,6 +3285,20 @@
   });
 
   document.getElementById("btn-saltar-moneda").addEventListener("click", cerrarSorteoMoneda);
+
+  // Alternativa al sorteo de moneda: en muchos clubs se decide "a pelota"
+  // (un peloteo corto y quien gana elige o saca). Esto solo aparece aquí,
+  // en el arranque del primer juego — a partir del segundo, el saque ya
+  // lo decide en exclusiva quien perdió el juego anterior (marcarPunto).
+  function elegirSaqueManual(lado){
+    if(!scorerState) return;
+    scorerState.startServer = lado;
+    renderScorer();
+    if(navigator.vibrate) navigator.vibrate(60);
+    cerrarSorteoMoneda();
+  }
+  document.getElementById("btn-elegir-a").addEventListener("click", ()=>elegirSaqueManual("a"));
+  document.getElementById("btn-elegir-b").addEventListener("click", ()=>elegirSaqueManual("b"));
 
   function currentGameScore(){
     let a=0,b=0;

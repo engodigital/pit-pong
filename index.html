@@ -385,6 +385,14 @@
   .stats-partido .comp{display:block;font-size:.72rem;opacity:.7;}
   .stats-partido .marcador{flex-shrink:0;font-weight:700;opacity:.85;}
   .stats-titulo{font-size:.8rem;font-weight:800;margin:6px 0 6px;opacity:.8;}
+  .badges-puntos{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+  .badge-puntos{
+    display:inline-flex;align-items:center;gap:4px;
+    background:var(--crema);border:1px solid var(--madera);border-radius:999px;
+    padding:4px 10px;font-size:.78rem;font-weight:600;white-space:nowrap;
+  }
+  .badge-puntos strong{font-size:.95em;}
+  .badge-pitcoin{background:var(--dorado);border-color:var(--madera-oscura);color:var(--tinta);}
   .parciales{font-size:.78em;opacity:.75;font-weight:400;white-space:nowrap;}
 
   /* Aviso de "red" (let): mensaje + luz parpadeante, no toca el marcador */
@@ -402,6 +410,23 @@
   @keyframes parpadeo-net{
     from{ background:var(--dorado); box-shadow:0 8px 30px rgba(0,0,0,.35); }
     to{ background:#fff3d6; box-shadow:0 8px 46px 6px rgba(194,140,66,.85); }
+  }
+  /* LED del botón Red: apagado (gris) en reposo, encendido (rojo con halo)
+     mientras el aviso está en pantalla. */
+  .led-net{
+    display:inline-block;width:10px;height:10px;border-radius:50%;
+    background:#7a2a22;box-shadow:inset 0 0 2px rgba(0,0,0,.5);
+    margin-right:6px;vertical-align:middle;
+    transition:background .15s, box-shadow .15s;
+  }
+  .led-net.encendido{
+    background:#ff3b30;
+    box-shadow:0 0 8px 3px rgba(255,59,48,.9), inset 0 0 2px rgba(0,0,0,.3);
+    animation:parpadeo-led .5s ease-in-out infinite alternate;
+  }
+  @keyframes parpadeo-led{
+    from{ box-shadow:0 0 8px 3px rgba(255,59,48,.9), inset 0 0 2px rgba(0,0,0,.3); }
+    to{ box-shadow:0 0 16px 6px rgba(255,59,48,1), inset 0 0 2px rgba(0,0,0,.3); }
   }
 
   /* Tarjeta del último campeón en la portada */
@@ -644,21 +669,22 @@
     display:flex;align-items:center;justify-content:center;padding:20px;
   }
   .moneda-caja{
+    position:relative;
     background:var(--crema);
     border:3px solid var(--dorado);
     border-radius:var(--radius);
-    padding:22px 20px;
+    padding:26px 22px;
     text-align:center;
-    max-width:380px;width:100%;
+    max-width:440px;width:100%;
     box-shadow:var(--shadow);
   }
   .moneda-titulo{
     font-family:"Arial Black","Segoe UI Black",Arial,sans-serif;
-    font-size:1.3rem;color:var(--madera-oscura);text-transform:uppercase;margin-bottom:14px;
+    font-size:1.5rem;color:var(--madera-oscura);text-transform:uppercase;margin-bottom:16px;
   }
   .moneda-escena{perspective:800px;display:flex;justify-content:center;margin-bottom:14px;}
   .moneda{
-    width:130px;height:130px;
+    width:150px;height:150px;
     position:relative;
     transform-style:preserve-3d;
     transition:transform 1.6s cubic-bezier(.25,.9,.25,1);
@@ -685,6 +711,15 @@
   }
   .moneda-resultado strong{color:var(--verde);}
   .moneda-manual-titulo{font-size:.72rem;opacity:.75;margin:12px 0 8px;}
+  .odds-filas{display:flex;gap:10px;}
+  .odds-fila{
+    flex:1;background:#fff8ec;border:2px solid var(--madera);border-radius:12px;
+    padding:12px 8px;
+  }
+  .odds-fila.favorito{border-color:var(--dorado);background:#fff3d6;}
+  .odds-nombre{font-weight:800;font-size:.95rem;margin-bottom:6px;overflow-wrap:break-word;}
+  .odds-prob{font-size:1.5rem;font-weight:800;color:var(--madera-oscura);}
+  .odds-cuota{font-size:.78rem;opacity:.8;margin-top:2px;}
   @media (orientation:landscape) and (max-height:520px){
     .moneda-caja{padding:12px 16px;max-width:420px;}
     .moneda-titulo{font-size:1rem;margin-bottom:8px;}
@@ -847,13 +882,17 @@
       <h3>🏓 Cómo se gana un punto</h3>
       <p>Toca el <strong>panel del jugador</strong> que ha ganado el punto. También puedes activar el <strong>micrófono</strong> y decir su nombre en voz alta.</p>
 
+      <h3>📊 Antes de empezar</h3>
+      <p>Aparece un aviso con las <strong>cuotas calculadas por el sistema</strong> (según las estadísticas de cada jugador: % de victorias y el historial entre ambos si ya han jugado antes). Solo informativo — todavía no se puede apostar. Se cierra solo a los 5 segundos, o con la ✕.</p>
+
       <h3>🔄 Quién saca</h3>
       <ul>
-        <li>Al empezar, la <strong>moneda</strong> decide quién saca primero.</li>
-        <li>El saque cambia <strong>cada 3 puntos</strong>.</li>
-        <li>Cuando alguien llega a <strong>10 puntos</strong>, se acaba la rotación: a partir de ahí <strong>saca siempre el que va perdiendo</strong>, hasta el final del juego.</li>
+        <li>Al empezar el partido, elegís cómo decidirlo: <strong>lanzar la moneda</strong>, o jugar una pelota corta y <strong>elegir a mano</strong> quién la ganó. Solo se decide así en el <strong>primer juego</strong>.</li>
+        <li>El saque cambia cada <strong>2, 3 o 5 puntos</strong> (se elige al configurar el partido, 3 por defecto).</li>
+        <li>Cuando alguien llega a <strong>10 puntos</strong> (si se juega a 11) o a <strong>20</strong> (si se juega a 21), se puede acabar la rotación: a partir de ahí <strong>saca siempre el que va perdiendo</strong>, hasta el final del juego. Esta regla también se puede desactivar al configurar el partido.</li>
+        <li>Desde el <strong>segundo juego</strong> en adelante, siempre saca primero quien <strong>perdió el juego anterior</strong> — ya no se vuelve a elegir.</li>
       </ul>
-      <p class="nota">En los partidos a 21 puntos, esa regla empieza a los <strong>20</strong>.</p>
+      <p class="nota">🔊 Con el aviso de voz activado, la tablet dice en alto "Saca [nombre]" cada vez que cambia el saque, para poder jugar sin mirar la pantalla.</p>
 
       <h3>🏅 Cómo se gana un juego</h3>
       <p>Gana quien llega antes a <strong>11 puntos</strong> (o a 21, según lo elegido), pero <strong>siempre con 2 de diferencia</strong>. Si van 10-10, hay que seguir hasta sacar dos: 12-10, 13-11…</p>
@@ -873,7 +912,16 @@
       <ul>
         <li><strong>Cambiar de campo:</strong> intercambia los lados cuando los jugadores se cambian de sitio en la mesa. Los puntos siguen a cada jugador, no se pierde nada.</li>
         <li><strong>Deshacer último punto:</strong> por si te has equivocado al tocar.</li>
+        <li><span class="led-net encendido" style="width:8px;height:8px;"></span> <strong>Red (repetir punto):</strong> si el saque toca la red, tócalo — se enciende una luz y aparece el aviso "¡RED!" para que se repita el punto. No cambia el marcador solo.</li>
+        <li><strong>⏸️ Pausar y guardar:</strong> el partido queda guardado en esta tablet tal cual está; aparece en la portada en "Partidos en pausa" para retomarlo más tarde exactamente donde se dejó.</li>
         <li><strong>Pantalla completa:</strong> los números se hacen enormes para verlos desde la mesa.</li>
+      </ul>
+
+      <h3>🪙 Puntos y PitCoin</h3>
+      <ul>
+        <li>Cada partido jugado da <strong>puntos en su categoría</strong>: 🏓 Single (partida suelta), 🔄 Liguilla, 🏆 Eliminatoria o 🎖️ Liga. Ganar da más puntos que perder.</li>
+        <li><strong>PitCoin</strong> es la suma de los puntos de las 4 categorías — el número "general" de cada jugador. Se ve en su ficha (botón 📊) y en el <strong>Ranking</strong>, que tiene dos vistas: la clasificación por medallas de torneo, y la de PitCoin.</li>
+        <li>De momento el PitCoin solo se gana jugando; todavía no se puede gastar ni apostar.</li>
       </ul>
 
     </div>
@@ -897,13 +945,13 @@
         <div class="home-campeon oculto" id="home-campeon"></div>
         <div class="home-pausas oculto" id="home-pausas"></div>
         <div class="fila" style="justify-content:center;margin-top:6px;">
-          <button class="btn dorado" id="btn-jugar-rapido" style="font-size:1rem;padding:12px 24px;">🏓 Jugar partido</button>
+          <button class="btn dorado" id="btn-jugar-rapido" style="font-size:1.3rem;padding:18px 28px;">🏓 Jugar partido</button>
           <button class="btn verde-claro" id="btn-ligas" style="font-size:1rem;padding:12px 24px;">🏅 Ligas</button>
           <button class="btn madera" id="btn-ranking" style="font-size:1rem;padding:12px 24px;">📊 Ranking</button>
         </div>
       </div>
       <div class="corner-grid">
-        <button class="corner-btn b-verde" id="btn-jugadores"><span class="emoji">🧑‍🤝‍🧑</span>Añadir jugadores</button>
+        <button class="corner-btn b-verde" id="btn-jugadores"><span class="emoji">🧑‍🤝‍🧑</span>Jugadores y estadísticas</button>
         <button class="corner-btn b-madera" id="btn-crear"><span class="emoji">🏆</span>Crear torneo</button>
         <button class="corner-btn b-azul" id="btn-continuar"><span class="emoji">🏓</span>Continuar torneo</button>
         <button class="corner-btn b-rojo" id="btn-historial"><span class="emoji">📸</span>Historial y fotos</button>
@@ -1059,7 +1107,7 @@
         <button class="btn" id="btn-add-jugador-rapido">+ Añadir</button>
       </div>
     </div>
-    <button class="btn dorado" id="btn-empezar-rapido" style="width:100%;font-size:1.05rem;">🏓 Empezar partido</button>
+    <button class="btn dorado" id="btn-empezar-rapido" style="width:100%;font-size:1.4rem;padding:20px;">🏓 Empezar partido</button>
   </main>
 </section>
 
@@ -1238,13 +1286,23 @@
     <div class="scorer-acciones">
       <button class="btn ghost" id="btn-deshacer">↩️ Deshacer último punto</button>
       <button class="btn madera" id="btn-cambiar-campo">🔄 Cambiar de campo</button>
-      <button class="btn azul" id="btn-net">🌐 Red (repetir punto)</button>
+      <button class="btn azul" id="btn-net"><span class="led-net" id="led-net"></span> Red (repetir punto)</button>
       <button class="btn verde-claro" id="btn-pausar-partido">⏸️ Pausar y guardar</button>
       <button class="btn rojo" id="btn-cancelar-partido">Cancelar partido</button>
     </div>
     <div id="scorer-ganador" class="oculto" style="margin-top:20px;"></div>
     <div class="net-aviso oculto" id="net-aviso">🌐 ¡RED!<br><span>Se repite el punto</span></div>
   </main>
+
+  <!-- Cuotas previas: se ve antes del sorteo, informativo, se cierra sola -->
+  <div id="odds-overlay" class="moneda-overlay oculto">
+    <div class="moneda-caja">
+      <button class="btn ghost small" id="btn-cerrar-odds" style="position:absolute;top:12px;right:12px;">✕</button>
+      <div class="moneda-titulo">📊 Antes de empezar</div>
+      <div id="odds-contenido"></div>
+      <p class="nota" style="margin-top:10px;">Cuotas calculadas por el sistema a partir de las estadísticas de cada jugador. Solo informativo — todavía no se puede apostar.</p>
+    </div>
+  </div>
 
   <!-- Sorteo inicial: decide quién saca -->
   <div id="moneda-overlay" class="moneda-overlay oculto">
@@ -1318,6 +1376,11 @@
     <div class="card">
       <h3>📊 Ranking del club</h3>
       <div class="home-stats">Cuentan todos los partidos: torneos, ligas y partidas sueltas.</div>
+      <div class="home-stats" id="ranking-total-club" style="font-weight:800;margin-top:2px;"></div>
+      <div class="fila toggle-grupo" id="toggle-ranking-modo" style="margin-top:10px;">
+        <button class="btn toggle-opcion activo" data-modo="atp" style="flex:1;">🏆 Ranking ATP</button>
+        <button class="btn toggle-opcion" data-modo="pitcoin" style="flex:1;">🪙 Ranking PitCoin</button>
+      </div>
       <div id="ranking-contenido" style="margin-top:10px;"></div>
       <div class="vacio oculto" id="ranking-vacio">Todavía no hay partidos jugados. ¡El ranking nace con el primero!</div>
     </div>
@@ -1672,7 +1735,7 @@
   const tituloBarra = document.getElementById("titulo-barra");
 
   function tituloDinamico(name){
-    if(name==="jugadores") return "Añadir jugadores";
+    if(name==="jugadores") return "Jugadores y estadísticas";
     if(name==="crear") return "Crear torneo";
     if(name==="continuar") return "Continuar torneo";
     if(name==="historial") return "Historial y fotos";
@@ -1691,6 +1754,7 @@
     opts = opts || {};
     if(name !== "scorer" && typeof vozActiva !== "undefined" && vozActiva){ detenerVoz(); }
     if(name !== "scorer" && "speechSynthesis" in window){ speechSynthesis.cancel(); }
+    if(name !== "scorer"){ clearTimeout(oddsTimeout); document.getElementById("odds-overlay").classList.add("oculto"); }
     document.querySelectorAll(".view").forEach(v => v.classList.add("oculto"));
     const el = document.getElementById("view-" + name);
     if(el) el.classList.remove("oculto");
@@ -1749,7 +1813,7 @@
     else showView("home");
   });
 
-  document.getElementById("btn-jugadores").addEventListener("click", ()=>showView("jugadores",{titulo:"Añadir jugadores"}));
+  document.getElementById("btn-jugadores").addEventListener("click", ()=>showView("jugadores",{titulo:"Jugadores y estadísticas"}));
   document.getElementById("btn-ranking").addEventListener("click", ()=>showView("ranking",{titulo:"Ranking del club"}));
   document.getElementById("btn-crear").addEventListener("click", ()=>showView("crear",{titulo:"Crear torneo"}));
   document.getElementById("btn-continuar").addEventListener("click", ()=>showView("continuar",{titulo:"Continuar torneo"}));
@@ -1830,6 +1894,87 @@
   }
 
   // Estilo ATP: mandan las medallas de torneo; a igualdad, las victorias.
+  /**
+   * Puntos de actividad por categoría — SIEMPRE una vista calculada sobre el
+   * historial real, nunca un contador guardado aparte (mismo patrón que el
+   * ranking ATP): jugar un partido da 1 punto en su categoría, ganarlo da 2
+   * puntos extra (3 en total). Así nunca puede desincronizarse de los
+   * partidos de verdad.
+   */
+  function calcularPuntosPorCategoria(id){
+    const cat = {single:0, liguilla:0, eliminatoria:0, liga:0};
+    partidosDeJugador(id).forEach(x=>{
+      if(cat[x.categoria] === undefined) return;
+      cat[x.categoria] += x.gano ? 3 : 1;
+    });
+    return cat;
+  }
+  // PitCoin = la suma de las 4 categorías. Sin ledger de movimientos todavía
+  // a propósito: hasta que exista canje o apuestas reales, un saldo que solo
+  // se puede GANAR (nunca gastar) es exactamente igual a esta suma, así que
+  // guardar algo aparte solo añadiría riesgo de desincronización sin ganar
+  // nada. El día que haya canjes/apuestas, esto pasa a ser un ledger.
+  function calcularPitcoin(id){
+    const c = calcularPuntosPorCategoria(id);
+    return c.single + c.liguilla + c.eliminatoria + c.liga;
+  }
+  /**
+   * Cuotas previas al partido — SOLO con estadísticas de partidos jugados
+   * (%V general + historial directo entre estos dos), nunca con PitCoin.
+   * Suavizado de Laplace ((victorias+1)/(jugados+2)) para que un 1-0 no
+   * salga como "100% seguro"; el historial directo pesa más que el general
+   * porque predice mejor ESTE enfrentamiento concreto, si existe.
+   */
+  function statsBasicasEquipo(ids){
+    let pj=0, pg=0;
+    ids.forEach(id=>{
+      const p = partidosDeJugador(id);
+      pj += p.length; pg += p.filter(x=>x.gano).length;
+    });
+    return {pj, pg};
+  }
+  function probabilidadVictoria(idsA, idsB){
+    const sa = statsBasicasEquipo(idsA), sb = statsBasicasEquipo(idsB);
+    const tasaA = (sa.pg+1)/(sa.pj+2);
+    const tasaB = (sb.pg+1)/(sb.pj+2);
+    let probA = tasaA/(tasaA+tasaB);
+    if(idsA.length===1 && idsB.length===1){
+      const h2h = partidosDeJugador(idsA[0]).filter(x=>x.rivalIds && x.rivalIds.includes(idsB[0]));
+      if(h2h.length){
+        const h2hPg = h2h.filter(x=>x.gano).length;
+        const probH2h = (h2hPg+1)/(h2h.length+2);
+        probA = 0.4*probA + 0.6*probH2h;
+      }
+    }
+    return Math.min(0.92, Math.max(0.08, probA));
+  }
+  function cuotaDecimal(prob){ return (Math.round((1/prob)*100)/100).toFixed(2); }
+
+  const CATEGORIAS_PUNTOS = [
+    {key:"single", icono:"🏓", nombre:"Single"},
+    {key:"liguilla", icono:"🔄", nombre:"Liguilla"},
+    {key:"eliminatoria", icono:"🏆", nombre:"Eliminatoria"},
+    {key:"liga", icono:"🎖️", nombre:"Liga"}
+  ];
+  function badgesPuntosHtml(id){
+    const c = calcularPuntosPorCategoria(id);
+    return CATEGORIAS_PUNTOS.map(cat=>
+      '<span class="badge-puntos" title="Puntos de '+cat.nombre+'">'+cat.icono+' '+cat.nombre+' <strong>'+c[cat.key]+'</strong></span>'
+    ).join("") + '<span class="badge-puntos badge-pitcoin" title="PitCoin: puntos de las 4 categorías sumados">🪙 PitCoin <strong>'+calcularPitcoin(id)+'</strong></span>';
+  }
+  // Partidos jugados en total en el club (torneos + ligas + sueltos), para
+  // que el ranking dé también una foto del pulso general, no solo de cada
+  // jugador por separado.
+  function contarPartidosTotalesClub(){
+    let n = 0;
+    tournaments.forEach(t=>{
+      if(t.matches && t.matches.length) n += t.matches.filter(m=>m.winner).length;
+      (t.rounds||[]).forEach(r=>{ n += r.filter(m=>m.winner).length; });
+    });
+    n += partidosSueltos.length;
+    return n;
+  }
+
   function calcularFilasRanking(){
     const medallero = medalleroClub();
     const filas = players.map(p=>{
@@ -1838,7 +1983,7 @@
       const pg = partidos.filter(x=>x.gano).length;
       const m = medallero[p.id] || {oro:0, plata:0, bronce:0};
       return {id:p.id, pj, pg, pp:pj-pg, pct: pj ? Math.round(pg*100/pj) : 0,
-              oro:m.oro, plata:m.plata, bronce:m.bronce};
+              oro:m.oro, plata:m.plata, bronce:m.bronce, pitcoin: calcularPitcoin(p.id)};
     });
     const nombre = f => playerName(f.id);
     const conActividad = filas.filter(f=>f.pj > 0 || f.oro || f.plata || f.bronce)
@@ -1849,34 +1994,58 @@
     return {conActividad, sinJugar};
   }
 
+  let rankingModo = "atp"; // "atp" (medallero) | "pitcoin" (saldo de PitCoin)
+
   function renderRanking(){
     const cont = document.getElementById("ranking-contenido");
     const vacio = document.getElementById("ranking-vacio");
     const {conActividad, sinJugar} = calcularFilasRanking();
     const nombre = f => playerName(f.id);
 
+    document.querySelectorAll("#toggle-ranking-modo .toggle-opcion")
+      .forEach(b=>b.classList.toggle("activo", b.dataset.modo===rankingModo));
+    document.getElementById("ranking-total-club").textContent =
+      "🏓 " + contarPartidosTotalesClub() + " partido(s) jugados en total en el club";
+
     vacio.classList.toggle("oculto", conActividad.length > 0);
     cont.innerHTML = "";
     if(!conActividad.length) return;
 
     const num = n => n ? '<strong>'+n+'</strong>' : '<span style="opacity:.35;">·</span>';
-    let html = '<div class="tabla-wrap"><table class="tabla-clasif">'+
-      '<thead><tr><th>#</th><th>Jugador</th><th>🥇</th><th>🥈</th><th>🥉</th><th>PG</th><th>PJ</th><th>%V</th></tr></thead><tbody>';
-    conActividad.forEach((f,i)=>{
-      html += '<tr'+(i===0?' class="fila-campeon"':'')+'>'+
-        '<td>'+(i+1)+'</td>'+
-        '<td class="col-nombre"><span class="ranking-fila-nombre">'+avatarHtml(f.id,26)+
-          '<span>'+escapeHtml(nombre(f))+'</span></span></td>'+
-        '<td>'+num(f.oro)+'</td><td>'+num(f.plata)+'</td><td>'+num(f.bronce)+'</td>'+
-        '<td><strong>'+f.pg+'</strong></td><td>'+f.pj+'</td><td>'+f.pct+'%</td></tr>';
-    });
-    html += '</tbody></table></div>';
-    html += '<div class="home-stats" style="margin-top:8px;">Ordena por medallas de torneo (🥇 oro, 🥈 plata, 🥉 bronce a los semifinalistas) y, a igualdad, por victorias.</div>';
+    let html = '<div class="tabla-wrap"><table class="tabla-clasif">';
+    if(rankingModo === "pitcoin"){
+      const porPitcoin = conActividad.slice().sort((a,b)=> b.pitcoin-a.pitcoin || b.pj-a.pj || nombre(a).localeCompare(nombre(b),"es"));
+      html += '<thead><tr><th>#</th><th>Jugador</th><th>🪙 PitCoin</th><th>PJ</th></tr></thead><tbody>';
+      porPitcoin.forEach((f,i)=>{
+        html += '<tr'+(i===0?' class="fila-campeon"':'')+'>'+
+          '<td>'+(i+1)+'</td>'+
+          '<td class="col-nombre"><span class="ranking-fila-nombre">'+avatarHtml(f.id,26)+
+            '<span>'+escapeHtml(nombre(f))+'</span></span></td>'+
+          '<td><strong>'+f.pitcoin+'</strong></td><td>'+f.pj+'</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      html += '<div class="home-stats" style="margin-top:8px;">🪙 PitCoin = puntos de Single + Liguilla + Eliminatoria + Liga sumados. Se ganan jugando, todavía no se pueden gastar.</div>';
+    } else {
+      html += '<thead><tr><th>#</th><th>Jugador</th><th>🥇</th><th>🥈</th><th>🥉</th><th>PG</th><th>PJ</th><th>%V</th></tr></thead><tbody>';
+      conActividad.forEach((f,i)=>{
+        html += '<tr'+(i===0?' class="fila-campeon"':'')+'>'+
+          '<td>'+(i+1)+'</td>'+
+          '<td class="col-nombre"><span class="ranking-fila-nombre">'+avatarHtml(f.id,26)+
+            '<span>'+escapeHtml(nombre(f))+'</span></span></td>'+
+          '<td>'+num(f.oro)+'</td><td>'+num(f.plata)+'</td><td>'+num(f.bronce)+'</td>'+
+          '<td><strong>'+f.pg+'</strong></td><td><strong>'+f.pj+'</strong></td><td>'+f.pct+'%</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      html += '<div class="home-stats" style="margin-top:8px;">Ordena por medallas de torneo (🥇 oro, 🥈 plata, 🥉 bronce a los semifinalistas) y, a igualdad, por victorias.</div>';
+    }
     if(sinJugar.length){
       html += '<div class="home-stats">Sin estrenar: '+sinJugar.map(f=>escapeHtml(nombre(f))).join(", ")+'</div>';
     }
     cont.innerHTML = html;
   }
+  document.querySelectorAll("#toggle-ranking-modo .toggle-opcion").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ rankingModo = btn.dataset.modo; renderRanking(); });
+  });
 
   /* ===================== JUGADORES ===================== */
   let editandoJugadorId = null;
@@ -1899,11 +2068,14 @@
         salida.push({
           gano: m.winner===id,
           rival: playerName(rivalId),
+          rivalIds: [rivalId],
           comp: t.name,
           marcador: m.scoreLabel || "",
           parciales: parcialesLabel(m.sets),
           fecha: m.playedAt || null,
-          orden: m.playedAt || ((t.createdAt||0) + (m.jornada||0))
+          orden: m.playedAt || ((t.createdAt||0) + (m.jornada||0)),
+          categoria: esLiga(t) ? "liga" : (esLiguilla(t) ? "liguilla" : "eliminatoria"),
+          partidoId: m.id || (t.id+"_"+(m.jornada||0)+"_"+m.a+"_"+m.b)
         });
       }));
     });
@@ -1917,13 +2089,16 @@
       salida.push({
         gano: p.ganador===miLado,
         rival: rivales,
+        rivalIds: (enA ? p.equipoB : p.equipoA).slice(),
         comp: p.modo==="2vs2"
           ? "Partida 2vs2" + (companeros.length ? " (con "+companeros.join(" + ")+")" : "")
           : "Partida suelta",
         marcador: p.scoreLabel || "",
         parciales: parcialesLabel(p.games),
         fecha: p.playedAt || null,
-        orden: p.playedAt || 0
+        orden: p.playedAt || 0,
+        categoria: "single",
+        partidoId: p.id
       });
     });
     // Más reciente primero. Los partidos de torneo se ordenan por la fecha
@@ -1950,6 +2125,8 @@
       '<div class="stats-caja"><span class="num" style="color:#b0503c;">'+pp+'</span><span class="eti">Perdidos</span></div>'+
       '<div class="stats-caja"><span class="num" style="color:'+(pj && partidos[0].gano ? '#2e7d4f' : (pj ? '#b0503c' : 'inherit'))+';">'+rachaTxt+'</span><span class="eti">Racha</span></div>'+
     '</div>';
+    html += '<div class="stats-titulo">Puntos por categoría</div>';
+    html += '<div class="badges-puntos">'+badgesPuntosHtml(p.id)+'</div>';
     if(pj){
       html += '<div class="stats-titulo">'+pct+'% de victorias</div>';
       html += '<div class="barra-victorias"><div style="width:'+pct+'%;"></div></div>';
@@ -3024,7 +3201,7 @@
     document.getElementById("check-anuncio-saque").classList.toggle(
       "oculto", !("speechSynthesis" in window));
     renderScorer();
-    if(mostrarMoneda !== false) mostrarSorteoMoneda();
+    if(mostrarMoneda !== false) mostrarOddsPrevias(mostrarSorteoMoneda); else cerrarOddsPrevias();
   }
 
   /* ===================== AVISO DE RED (let) ===================== */
@@ -3034,12 +3211,14 @@
   function mostrarAvisoNet(){
     const el = document.getElementById("net-aviso");
     el.classList.remove("oculto");
+    document.getElementById("led-net").classList.add("encendido");
     if(navigator.vibrate) navigator.vibrate([120,80,120,80,120]);
     clearTimeout(netTimeout);
     netTimeout = setTimeout(ocultarAvisoNet, 4000);
   }
   function ocultarAvisoNet(){
     document.getElementById("net-aviso").classList.add("oculto");
+    document.getElementById("led-net").classList.remove("encendido");
     clearTimeout(netTimeout);
   }
   document.getElementById("btn-net").addEventListener("click", mostrarAvisoNet);
@@ -3341,8 +3520,45 @@
   /* ===================== SORTEO DE MONEDA (quién saca) ===================== */
   let monedaGiro = 0;
   let monedaResuelta = false;
+  let oddsTimeout = null;
+
+  /**
+   * Popup de cuotas: aparece antes del sorteo, solo informativo (no se
+   * puede apostar todavía). Se cierra con la X o solo a los 5 segundos, y
+   * entonces sigue con el sorteo (parámetro `siguiente`, normalmente
+   * mostrarSorteoMoneda) — así encaja tanto en partido nuevo como si algún
+   * día se salta el sorteo por otro motivo.
+   */
+  function mostrarOddsPrevias(siguiente){
+    const idsA = scorerState.a.ids, idsB = scorerState.b.ids;
+    const probA = probabilidadVictoria(idsA, idsB);
+    const probB = 1 - probA;
+    const cont = document.getElementById("odds-contenido");
+    cont.innerHTML = '<div class="odds-filas">'+
+      '<div class="odds-fila'+(probA>=probB?' favorito':'')+'">'+
+        '<div class="odds-nombre">'+escapeHtml(scorerState.a.label)+'</div>'+
+        '<div class="odds-prob">'+Math.round(probA*100)+'%</div>'+
+        '<div class="odds-cuota">Cuota '+cuotaDecimal(probA)+'</div>'+
+      '</div>'+
+      '<div class="odds-fila'+(probB>probA?' favorito':'')+'">'+
+        '<div class="odds-nombre">'+escapeHtml(scorerState.b.label)+'</div>'+
+        '<div class="odds-prob">'+Math.round(probB*100)+'%</div>'+
+        '<div class="odds-cuota">Cuota '+cuotaDecimal(probB)+'</div>'+
+      '</div>'+
+    '</div>';
+    document.getElementById("odds-overlay").classList.remove("oculto");
+    clearTimeout(oddsTimeout);
+    oddsTimeout = setTimeout(()=>cerrarOddsPrevias(siguiente), 5000);
+  }
+  function cerrarOddsPrevias(siguiente){
+    clearTimeout(oddsTimeout);
+    document.getElementById("odds-overlay").classList.add("oculto");
+    if(siguiente) siguiente();
+  }
+  document.getElementById("btn-cerrar-odds").addEventListener("click", ()=>cerrarOddsPrevias(mostrarSorteoMoneda));
 
   function mostrarSorteoMoneda(){
+    if(!scorerState) return; // por si el partido se canceló mientras sonaba el aviso de cuotas
     const moneda = document.getElementById("moneda");
     document.getElementById("moneda-cara-a").textContent = scorerState.a.label;
     document.getElementById("moneda-cara-b").textContent = scorerState.b.label;
@@ -3721,12 +3937,31 @@
     document.querySelector(".scorer-acciones").classList.add("oculto");
     const box = document.getElementById("scorer-ganador");
     box.classList.remove("oculto");
-    const textoBoton = scorerState.tipo==="torneo" ? "Confirmar y volver al cuadro" : "Confirmar y guardar en historial";
+    const textoBoton = scorerState.tipo==="torneo" ? "✔ Guardar y volver al cuadro" : "✔ Guardar en historial";
     box.innerHTML =
       '<div class="ganador-box"><h2>🏆 '+escapeHtml(ganadorLado.label)+'</h2>'+
       '<div>Gana el partido '+scoreLabel+'</div>'+
-      '<button class="btn dorado" id="btn-confirmar-resultado" style="margin-top:16px;">'+textoBoton+'</button></div>';
-    document.getElementById("btn-confirmar-resultado").addEventListener("click", ()=>{
+      '<button class="btn dorado" id="btn-confirmar-resultado" style="margin-top:16px;width:100%;">'+textoBoton+'</button>'+
+      '<button class="btn madera" id="btn-revancha-resultado" style="margin-top:8px;width:100%;">🔁 Revancha (mismos jugadores)</button>'+
+      '<button class="btn ghost" id="btn-inicio-resultado" style="margin-top:8px;width:100%;">🏠 Volver al inicio</button>'+
+      '</div>';
+
+    // Hay que capturarlos ANTES de guardar: en cuanto se guarda el
+    // resultado, scorerState se pone a null y se pierde esta información.
+    const datosRevancha = {
+      modo: scorerState.modo || (scorerState.a.ids.length>1 ? "2vs2" : "1vs1"),
+      equipoA: scorerState.a.ids.slice(),
+      equipoB: scorerState.b.ids.slice(),
+      pointsPerGame: scorerState.pointsPerGame,
+      setsToWin: scorerState.setsToWin,
+      saqueCada: scorerState.saqueCada,
+      ventajaPerdedor: scorerState.ventajaPerdedor
+    };
+
+    let yaGuardado = false;
+    function guardarSiHaceFalta(){
+      if(yaGuardado) return;
+      yaGuardado = true;
       if(scorerState.tipo === "torneo"){
         const t = getTournament(scorerState.tournamentId);
         const ctx = currentScorerCtx;
@@ -3777,6 +4012,23 @@
         historialReciénFinalizado = true;
         showView("detalle-historial", {titulo: nombreRegistroHistorial({tipo:"libre",obj:partido})});
       }
+    }
+
+    document.getElementById("btn-confirmar-resultado").addEventListener("click", guardarSiHaceFalta);
+    document.getElementById("btn-inicio-resultado").addEventListener("click", ()=>{
+      guardarSiHaceFalta();
+      showView("home"); // pisa la navegación por defecto de guardarSiHaceFalta a propósito
+    });
+    document.getElementById("btn-revancha-resultado").addEventListener("click", ()=>{
+      guardarSiHaceFalta();
+      // Revancha = siempre una partida suelta nueva, aunque el partido
+      // recién guardado fuera de torneo/liga: así nunca toca el cuadro ni
+      // la clasificación ya guardados, solo empieza a jugar otra vez ya.
+      iniciarScorerLibre(datosRevancha.modo, datosRevancha.equipoA, datosRevancha.equipoB, datosRevancha.pointsPerGame);
+      scorerState.setsToWin = datosRevancha.setsToWin;
+      scorerState.saqueCada = datosRevancha.saqueCada;
+      scorerState.ventajaPerdedor = datosRevancha.ventajaPerdedor;
+      showView("scorer", {titulo:"Marcador"});
     });
   }
 

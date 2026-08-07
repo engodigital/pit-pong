@@ -151,9 +151,29 @@ function fecha_(ms) {
 
 /* ============================ API ============================ */
 
+/**
+ * Quita pinHash de cualquier respuesta que vaya al cliente y lo sustituye
+ * por un booleano. Corrige el agujero de seguridad del sistema de
+ * referencia (Academy `?action=users`): el hash del PIN no debe salir
+ * NUNCA de este servidor, ni de doGet ni de doPost.
+ */
+function sanitizarParaCliente_(datos) {
+  var copia = JSON.parse(JSON.stringify(datos));
+  copia.jugadores = (copia.jugadores || []).map(function (j) {
+    return {
+      id: j.id,
+      name: j.name,
+      creadoEn: j.creadoEn,
+      photo: j.photo,
+      tieneCuenta: !!(j.pinHash && String(j.pinHash).trim())
+    };
+  });
+  return copia;
+}
+
 function doGet(e) {
   try {
-    return json_({ ok: true, datos: cargarTodo_() });
+    return json_({ ok: true, datos: sanitizarParaCliente_(cargarTodo_()) });
   } catch (err) {
     return json_({ ok: false, error: String(err) });
   }
@@ -167,13 +187,22 @@ function doPost(e) {
     if (accion === 'guardar') {
       // guardarTodo_ ya devuelve el estado fusionado: releer la hoja otra vez
       // sólo para responder duplicaba el tiempo de guardado.
-      return json_({ ok: true, datos: guardarTodo_(body.datos) });
+      return json_({ ok: true, datos: sanitizarParaCliente_(guardarTodo_(body.datos)) });
     }
     if (accion === 'cargar') {
-      return json_({ ok: true, datos: cargarTodo_() });
+      return json_({ ok: true, datos: sanitizarParaCliente_(cargarTodo_()) });
     }
     if (accion === 'subirFoto') {
       return json_({ ok: true, foto: subirFoto_(body) });
+    }
+    if (accion === 'verificarPin') {
+      return json_(verificarPin_(body.jugadorId, body.hash));
+    }
+    if (accion === 'crearPin') {
+      return json_(crearPin_(body.jugadorId, body.hash));
+    }
+    if (accion === 'resetearPin') {
+      return json_(resetearPin_(body.jugadorId));
     }
     return json_({ ok: false, error: 'Acción desconocida: ' + accion });
   } catch (err) {
@@ -181,15 +210,80 @@ function doPost(e) {
   }
 }
 
+/* ------------------------------ LOGIN PIN ------------------------------
+ * El PIN en crudo nunca llega aquí: el cliente calcula hashPin(...) y sólo
+ * manda/compara el hash (ver index.html). La comparación se hace SIEMPRE
+ * en este servidor — nunca se devuelve la lista de hashes al cliente.
+ */
+function _colIndice_(cab, nombre) {
+  for (var i = 0; i < cab.length; i++) if (cab[i] === nombre) return i;
+  return -1;
+}
+
+function _filaJugador_(id) {
+  var h = hoja_('Jugadores');
+  var datos = h.getDataRange().getValues();
+  var cab = datos[0];
+  var colId = _colIndice_(cab, 'id');
+  var colPin = _colIndice_(cab, 'pin_hash');
+  if (colId < 0 || colPin < 0) throw new Error('Falta la columna id o pin_hash en Jugadores');
+  for (var i = 1; i < datos.length; i++) {
+    if (String(datos[i][colId]) === String(id)) {
+      return { hoja: h, fila: i + 1, colPin: colPin + 1, pinHash: String(datos[i][colPin] || '') };
+    }
+  }
+  return null;
+}
+
+function verificarPin_(jugadorId, hash) {
+  var f = _filaJugador_(jugadorId);
+  if (!f) return { ok: false, error: 'Jugador no encontrado' };
+  if (!f.pinHash) return { ok: false, error: 'Este jugador no tiene PIN creado' };
+  return { ok: true, valido: f.pinHash === String(hash || '') };
+}
+
+function crearPin_(jugadorId, hash) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var f = _filaJugador_(jugadorId);
+    if (!f) return { ok: false, error: 'Jugador no encontrado' };
+    if (f.pinHash) return { ok: false, error: 'Este jugador ya tiene un PIN creado' };
+    f.hoja.getRange(f.fila, f.colPin).setValue(String(hash || ''));
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Sólo uso admin (borra el PIN para forzar "crear PIN" en el próximo login). */
+function resetearPin_(jugadorId) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var f = _filaJugador_(jugadorId);
+    if (!f) return { ok: false, error: 'Jugador no encontrado' };
+    f.hoja.getRange(f.fila, f.colPin).setValue('');
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /* ------------------------------ CARGAR ------------------------------ */
 
 function cargarTodo_() {
+  // pinHash viaja en el objeto interno (lo necesita guardarTodo_ para no
+  // perderlo al fusionar), pero NUNCA debe salir en una respuesta al
+  // cliente: sanitizarParaCliente_ lo sustituye por un booleano antes de
+  // cualquier json_() de doGet/doPost.
   var jugadores = leerTabla_('Jugadores').map(function (f) {
     return {
       id: String(f.id),
       name: String(f.nombre),
       creadoEn: f.creadoEn || '',
-      photo: f.foto ? String(f.foto) : ''
+      photo: f.foto ? String(f.foto) : '',
+      pinHash: f.pin_hash ? String(f.pin_hash) : ''
     };
   });
 
@@ -309,7 +403,18 @@ function guardarTodo_(datos) {
     var actual = cargarTodo_();
     var elim = datos.eliminados || {};
 
-    var jugadores = mergePorId_(actual.jugadores, datos.jugadores, elim.jugadores);
+    // El cliente jamás manda pinHash (nunca lo recibe, ver cargarTodo_):
+    // el PIN sólo se crea/verifica/resetea por las acciones dedicadas de
+    // más abajo. Aquí lo conservamos tal cual estaba en la hoja para que
+    // un guardado normal (añadir jugador, cerrar un partido...) no lo borre.
+    var actualPinPorId = {};
+    (actual.jugadores || []).forEach(function (j) { actualPinPorId[j.id] = j.pinHash || ''; });
+
+    var jugadores = mergePorId_(actual.jugadores, datos.jugadores, elim.jugadores)
+      .map(function (j) {
+        j.pinHash = actualPinPorId[j.id] || '';
+        return j;
+      });
     var torneos = mergePorId_(actual.torneos, datos.torneos, elim.torneos);
     var sueltos = mergePorId_(actual.partidosSueltos, datos.partidosSueltos, elim.partidosSueltos);
 
@@ -322,7 +427,8 @@ function guardarTodo_(datos) {
         id: j.id,
         nombre: j.name,
         creadoEn: j.creadoEn || fecha_(Date.now()),
-        foto: j.photo || ''
+        foto: j.photo || '',
+        pin_hash: j.pinHash || ''
       };
     }));
 

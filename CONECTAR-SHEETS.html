@@ -87,9 +87,18 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Conectar Pit Pong con Google Sheets</h1>
-    <p>3 pasos · unos 2 minutos · así los resultados se ven desde cualquier dispositivo</p>
+    <h1>Actualizar el backend de Pit Pong</h1>
+    <p>3 pasos · unos 2 minutos · vuelve a hacer falta porque el código del servidor cambió</p>
   </header>
+
+  <div class="paso" style="border-color:var(--dorado);background:#fff3d6;">
+    <h2>🆕 Qué cambió y por qué hay que repetir esto</h2>
+    <p>Esta sesión se añadió el <strong>login con PIN</strong> (nombre + PIN para verificar la cuenta de un jugador). El código nuevo vive en <code>apps-script/Codigo.gs</code>, pero ese archivo solo existe en tu ordenador — el servidor de Google sigue ejecutando el código viejo hasta que lo pegas tú a mano y publicas de nuevo (paso 2 y 3 de aquí abajo). La URL <code>/exec</code> no cambia, así que la app no necesita ningún ajuste más una vez publiques.</p>
+    <ul>
+      <li>3 acciones nuevas: <span class="campo">verificarPin</span>, <span class="campo">crearPin</span>, <span class="campo">resetearPin</span>.</li>
+      <li>Corrección de seguridad: el PIN se compara <strong>siempre en el servidor</strong> — a diferencia del sistema de referencia (Academy), el hash del PIN nunca sale en ninguna respuesta pública.</li>
+    </ul>
+  </div>
 
   <div class="paso">
     <h2><span class="num">1</span> Abrir el editor de Apps Script</h2>
@@ -100,7 +109,7 @@
 
   <div class="paso">
     <h2><span class="num">2</span> Pegar el código</h2>
-    <p>En el editor, <strong>borra todo</strong> lo que haya (suele venir un <code>function myFunction() {}</code>) y pega esto. Luego guarda con <span class="campo">⌘ S</span>.</p>
+    <p>En el editor verás el código de la versión anterior. <strong>Selecciona todo (⌘A) y bórralo</strong>, y pega esto en su lugar. Luego guarda con <span class="campo">⌘ S</span>.</p>
     <button class="btn dorado btn-grande" id="btn-copiar">📋 Copiar el código</button>
     <div class="estado-copia" id="estado"></div>
     <details style="margin-top:12px;">
@@ -258,9 +267,29 @@ function fecha_(ms) {
 
 /* ============================ API ============================ */
 
+/**
+ * Quita pinHash de cualquier respuesta que vaya al cliente y lo sustituye
+ * por un booleano. Corrige el agujero de seguridad del sistema de
+ * referencia (Academy `?action=users`): el hash del PIN no debe salir
+ * NUNCA de este servidor, ni de doGet ni de doPost.
+ */
+function sanitizarParaCliente_(datos) {
+  var copia = JSON.parse(JSON.stringify(datos));
+  copia.jugadores = (copia.jugadores || []).map(function (j) {
+    return {
+      id: j.id,
+      name: j.name,
+      creadoEn: j.creadoEn,
+      photo: j.photo,
+      tieneCuenta: !!(j.pinHash &amp;&amp; String(j.pinHash).trim())
+    };
+  });
+  return copia;
+}
+
 function doGet(e) {
   try {
-    return json_({ ok: true, datos: cargarTodo_() });
+    return json_({ ok: true, datos: sanitizarParaCliente_(cargarTodo_()) });
   } catch (err) {
     return json_({ ok: false, error: String(err) });
   }
@@ -274,13 +303,22 @@ function doPost(e) {
     if (accion === 'guardar') {
       // guardarTodo_ ya devuelve el estado fusionado: releer la hoja otra vez
       // sólo para responder duplicaba el tiempo de guardado.
-      return json_({ ok: true, datos: guardarTodo_(body.datos) });
+      return json_({ ok: true, datos: sanitizarParaCliente_(guardarTodo_(body.datos)) });
     }
     if (accion === 'cargar') {
-      return json_({ ok: true, datos: cargarTodo_() });
+      return json_({ ok: true, datos: sanitizarParaCliente_(cargarTodo_()) });
     }
     if (accion === 'subirFoto') {
       return json_({ ok: true, foto: subirFoto_(body) });
+    }
+    if (accion === 'verificarPin') {
+      return json_(verificarPin_(body.jugadorId, body.hash));
+    }
+    if (accion === 'crearPin') {
+      return json_(crearPin_(body.jugadorId, body.hash));
+    }
+    if (accion === 'resetearPin') {
+      return json_(resetearPin_(body.jugadorId));
     }
     return json_({ ok: false, error: 'Acción desconocida: ' + accion });
   } catch (err) {
@@ -288,15 +326,80 @@ function doPost(e) {
   }
 }
 
+/* ------------------------------ LOGIN PIN ------------------------------
+ * El PIN en crudo nunca llega aquí: el cliente calcula hashPin(...) y sólo
+ * manda/compara el hash (ver index.html). La comparación se hace SIEMPRE
+ * en este servidor — nunca se devuelve la lista de hashes al cliente.
+ */
+function _colIndice_(cab, nombre) {
+  for (var i = 0; i &lt; cab.length; i++) if (cab[i] === nombre) return i;
+  return -1;
+}
+
+function _filaJugador_(id) {
+  var h = hoja_('Jugadores');
+  var datos = h.getDataRange().getValues();
+  var cab = datos[0];
+  var colId = _colIndice_(cab, 'id');
+  var colPin = _colIndice_(cab, 'pin_hash');
+  if (colId &lt; 0 || colPin &lt; 0) throw new Error('Falta la columna id o pin_hash en Jugadores');
+  for (var i = 1; i &lt; datos.length; i++) {
+    if (String(datos[i][colId]) === String(id)) {
+      return { hoja: h, fila: i + 1, colPin: colPin + 1, pinHash: String(datos[i][colPin] || '') };
+    }
+  }
+  return null;
+}
+
+function verificarPin_(jugadorId, hash) {
+  var f = _filaJugador_(jugadorId);
+  if (!f) return { ok: false, error: 'Jugador no encontrado' };
+  if (!f.pinHash) return { ok: false, error: 'Este jugador no tiene PIN creado' };
+  return { ok: true, valido: f.pinHash === String(hash || '') };
+}
+
+function crearPin_(jugadorId, hash) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var f = _filaJugador_(jugadorId);
+    if (!f) return { ok: false, error: 'Jugador no encontrado' };
+    if (f.pinHash) return { ok: false, error: 'Este jugador ya tiene un PIN creado' };
+    f.hoja.getRange(f.fila, f.colPin).setValue(String(hash || ''));
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Sólo uso admin (borra el PIN para forzar "crear PIN" en el próximo login). */
+function resetearPin_(jugadorId) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var f = _filaJugador_(jugadorId);
+    if (!f) return { ok: false, error: 'Jugador no encontrado' };
+    f.hoja.getRange(f.fila, f.colPin).setValue('');
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /* ------------------------------ CARGAR ------------------------------ */
 
 function cargarTodo_() {
+  // pinHash viaja en el objeto interno (lo necesita guardarTodo_ para no
+  // perderlo al fusionar), pero NUNCA debe salir en una respuesta al
+  // cliente: sanitizarParaCliente_ lo sustituye por un booleano antes de
+  // cualquier json_() de doGet/doPost.
   var jugadores = leerTabla_('Jugadores').map(function (f) {
     return {
       id: String(f.id),
       name: String(f.nombre),
       creadoEn: f.creadoEn || '',
-      photo: f.foto ? String(f.foto) : ''
+      photo: f.foto ? String(f.foto) : '',
+      pinHash: f.pin_hash ? String(f.pin_hash) : ''
     };
   });
 
@@ -416,7 +519,18 @@ function guardarTodo_(datos) {
     var actual = cargarTodo_();
     var elim = datos.eliminados || {};
 
-    var jugadores = mergePorId_(actual.jugadores, datos.jugadores, elim.jugadores);
+    // El cliente jamás manda pinHash (nunca lo recibe, ver cargarTodo_):
+    // el PIN sólo se crea/verifica/resetea por las acciones dedicadas de
+    // más abajo. Aquí lo conservamos tal cual estaba en la hoja para que
+    // un guardado normal (añadir jugador, cerrar un partido...) no lo borre.
+    var actualPinPorId = {};
+    (actual.jugadores || []).forEach(function (j) { actualPinPorId[j.id] = j.pinHash || ''; });
+
+    var jugadores = mergePorId_(actual.jugadores, datos.jugadores, elim.jugadores)
+      .map(function (j) {
+        j.pinHash = actualPinPorId[j.id] || '';
+        return j;
+      });
     var torneos = mergePorId_(actual.torneos, datos.torneos, elim.torneos);
     var sueltos = mergePorId_(actual.partidosSueltos, datos.partidosSueltos, elim.partidosSueltos);
 
@@ -429,7 +543,8 @@ function guardarTodo_(datos) {
         id: j.id,
         nombre: j.name,
         creadoEn: j.creadoEn || fecha_(Date.now()),
-        foto: j.photo || ''
+        foto: j.photo || '',
+        pin_hash: j.pinHash || ''
       };
     }));
 
@@ -541,15 +656,15 @@ function subirFoto_(body) {
   </div>
 
   <div class="paso">
-    <h2><span class="num">3</span> Publicar y darme el enlace</h2>
-    <p>Arriba a la derecha: <span class="campo">Implementar</span> &rarr; <span class="campo">Nueva implementación</span> &rarr; icono ⚙️ &rarr; <span class="campo">Aplicación web</span>. Rellena así:</p>
+    <h2><span class="num">3</span> Publicar la nueva versión (misma URL de siempre)</h2>
+    <div class="aviso rojo">⚠️ Esta vez NO es "Nueva implementación" (eso crearía una URL distinta y rompería la app, que ya tiene la URL vieja guardada). Es <strong>actualizar la implementación que ya existe</strong>, para que la URL <code>/exec</code> siga siendo la misma.</div>
+    <p>Arriba a la derecha: <span class="campo">Implementar</span> &rarr; <span class="campo">Gestionar implementaciones</span>. Verás la implementación activa (aplicación web) — pulsa el lápiz ✏️ para editarla.</p>
     <ul>
-      <li><strong>Ejecutar como:</strong> <span class="campo">Yo</span></li>
-      <li><strong>Quién tiene acceso:</strong> <span class="campo">Cualquier usuario</span></li>
+      <li>En <strong>Versión</strong>, cambia a <span class="campo">Nueva versión</span>.</li>
+      <li>Deja tal cual <strong>Ejecutar como: Yo</strong> y <strong>Quién tiene acceso: Cualquier usuario</strong> (no los toques).</li>
     </ul>
-    <div class="aviso rojo">⚠️ Si dejas «Solo yo» en el segundo campo, las tablets y los móviles <strong>no podrán guardar</strong> los resultados. Tiene que ser «Cualquier usuario».</div>
-    <p>Pulsa <span class="campo">Implementar</span>. Google te pedirá autorizar: dirá que la app «no está verificada» — es normal, la has hecho tú. Pulsa <span class="campo">Configuración avanzada</span> &rarr; <span class="campo">Ir a Pit Pong DB (no seguro)</span> &rarr; <span class="campo">Permitir</span>.</p>
-    <div class="aviso">Al final te dará una <strong>URL de la aplicación web</strong> que acaba en <code>/exec</code>. Cópiala y pásamela por el chat: yo la meto en la app y publico.</div>
+    <p>Pulsa <span class="campo">Implementar</span>. Si Google vuelve a pedir autorización, dirá que la app «no está verificada» — es normal, la has hecho tú: <span class="campo">Configuración avanzada</span> &rarr; <span class="campo">Ir a Pit Pong DB (no seguro)</span> &rarr; <span class="campo">Permitir</span>.</p>
+    <div class="aviso">No hace falta copiar ninguna URL nueva ni tocar nada más en la app — cuando termines, avísame por el chat y pruebo el login en directo.</div>
   </div>
 
   <footer>Pit Pong · CSC Green Pit Stop · colores del cartel oficial</footer>

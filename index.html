@@ -282,6 +282,12 @@
   .btn.verde-claro{background:var(--verde);}
   .btn.ghost{background:transparent;border:2px solid var(--madera);color:var(--madera-oscura);}
   .btn[disabled]{opacity:.4;cursor:not-allowed;}
+  /* Acción primaria de la portada: zoom in/out suave para que destaque
+     sobre Ligas/Ranking, que ahora son secundarios debajo. */
+  @keyframes pulso-zoom{ 0%,100%{transform:scale(1);} 50%{transform:scale(1.06);} }
+  .btn-primario-pulso{animation:pulso-zoom 1.8s ease-in-out infinite;}
+  .btn-primario-pulso:active{animation:none;}
+  @media (prefers-reduced-motion: reduce){ .btn-primario-pulso{animation:none;} }
   .btn.small{padding:7px 12px;min-height:36px;font-size:.85rem;}
 
   input[type=text],input[type=number],textarea{
@@ -390,7 +396,9 @@
     display:inline-flex;align-items:center;gap:4px;
     background:var(--crema);border:1px solid var(--madera);border-radius:999px;
     padding:4px 10px;font-size:.78rem;font-weight:600;white-space:nowrap;
+    font-family:inherit;color:var(--tinta);cursor:pointer;-webkit-appearance:none;appearance:none;
   }
+  .badge-puntos:active{opacity:.8;}
   .badge-puntos strong{font-size:.95em;}
   .badge-pitcoin{background:var(--dorado);border-color:var(--madera-oscura);color:var(--tinta);}
   .parciales{font-size:.78em;opacity:.75;font-weight:400;white-space:nowrap;}
@@ -455,6 +463,12 @@
     padding:1px 7px;margin-left:5px;vertical-align:middle;white-space:nowrap;
   }
   .fila-campeon .pos-atp{background:#fff8ec;}
+  /* Cuenta con PIN creado (login), junto al nombre en Jugadores y estadísticas */
+  .badge-verificado{
+    display:inline-block;font-size:.72em;font-weight:800;line-height:1.2;
+    color:#fff;background:var(--verde);
+    border-radius:999px;padding:1px 7px;margin-left:5px;vertical-align:middle;white-space:nowrap;
+  }
 
   /* Resultados del detalle del historial: legibles desde lejos, sin
      desperdiciar la tarjeta en texto pequeño. */
@@ -643,10 +657,7 @@
   .reglas-cabecera h2{margin:0;font-size:1.15rem;color:var(--dorado);}
   .reglas-cabecera .btn.ghost{color:#fff;border-color:rgba(255,255,255,.6);}
   .reglas-cuerpo{padding:16px 20px 22px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-  .reglas-cuerpo h3{
-    margin:18px 0 6px;font-size:1rem;color:var(--madera-oscura);
-  }
-  .reglas-cuerpo h3:first-child{margin-top:0;}
+  .reglas-cuerpo .filtros{margin-bottom:10px;}
   .reglas-cuerpo p{margin:0 0 8px;font-size:.92rem;line-height:1.55;}
   .reglas-cuerpo ul{margin:0 0 8px;padding-left:20px;}
   .reglas-cuerpo li{margin-bottom:6px;font-size:.92rem;line-height:1.5;}
@@ -655,10 +666,23 @@
     font-size:.82rem;background:#fff8ec;border-left:4px solid var(--dorado);
     padding:7px 10px;border-radius:0 8px 8px 0;
   }
+  /* Acordeón por tema: cada uno profundiza solo en lo que le interesa */
+  .reglas-item{border-bottom:1px solid rgba(150,88,40,.25);}
+  .reglas-item:last-child{border-bottom:none;}
+  .reglas-item.oculto-busqueda{display:none;}
+  .reglas-item-cabecera{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    width:100%;background:none;border:none;text-align:left;cursor:pointer;
+    padding:13px 2px;font-weight:800;font-size:.98rem;color:var(--madera-oscura);
+    min-height:44px;font-family:inherit;
+  }
+  .reglas-item-cabecera .reglas-flecha{font-size:.8rem;opacity:.7;transition:transform .2s;flex-shrink:0;}
+  .reglas-item.abierto .reglas-flecha{transform:rotate(180deg);}
+  .reglas-item-cuerpo{padding:0 2px 14px;}
   @media (orientation:landscape) and (max-height:520px){
     .reglas-caja{max-height:94vh;}
     .reglas-cuerpo{padding:12px 16px 16px;}
-    .reglas-cuerpo h3{margin:12px 0 4px;font-size:.9rem;}
+    .reglas-item-cabecera{padding:9px 2px;font-size:.85rem;}
     .reglas-cuerpo p, .reglas-cuerpo li{font-size:.82rem;}
   }
 
@@ -718,8 +742,14 @@
   }
   .odds-fila.favorito{border-color:var(--dorado);background:#fff3d6;}
   .odds-nombre{font-weight:800;font-size:.95rem;margin-bottom:6px;overflow-wrap:break-word;}
-  .odds-prob{font-size:1.5rem;font-weight:800;color:var(--madera-oscura);}
-  .odds-cuota{font-size:.78rem;opacity:.8;margin-top:2px;}
+  .odds-tag{
+    display:inline-block;font-size:.68rem;font-weight:800;letter-spacing:.03em;
+    color:#fff;background:var(--verde);border-radius:999px;padding:2px 8px;margin-bottom:6px;
+  }
+  .odds-prob{font-size:1.6rem;font-weight:800;color:var(--madera-oscura);}
+  .odds-fila.favorito .odds-prob{color:var(--verde-oscuro);}
+  .odds-cuota{font-size:.85rem;font-weight:700;opacity:.85;margin-top:2px;}
+  .odds-cuota strong{color:var(--rojo);}
   @media (orientation:landscape) and (max-height:520px){
     .moneda-caja{padding:12px 16px;max-width:420px;}
     .moneda-titulo{font-size:1rem;margin-bottom:8px;}
@@ -878,52 +908,141 @@
       <button class="btn ghost small" id="btn-cerrar-reglas">✕ Cerrar</button>
     </div>
     <div class="reglas-cuerpo">
+      <div class="filtros">
+        <input type="text" class="buscador" id="reglas-buscador" placeholder="🔍 Buscar en las reglas… (ej. saque, PitCoin, red)">
+      </div>
+      <div class="vacio oculto" id="reglas-sin-resultados">Ninguna regla coincide con la búsqueda.</div>
 
-      <h3>🏓 Cómo se gana un punto</h3>
-      <p>Toca el <strong>panel del jugador</strong> que ha ganado el punto. También puedes activar el <strong>micrófono</strong> y decir su nombre en voz alta.</p>
+      <div class="reglas-item" data-tema="1">
+        <button class="reglas-item-cabecera"><span>🏓 Cómo se gana un punto</span><span class="reglas-flecha">▾</span></button>
+        <div class="reglas-item-cuerpo oculto">
+          <p>Toca el <strong>panel del jugador</strong> que ha ganado el punto. También puedes activar el <strong>micrófono</strong> y decir su nombre en voz alta.</p>
+        </div>
+      </div>
 
-      <h3>📊 Antes de empezar</h3>
-      <p>Aparece un aviso con las <strong>cuotas calculadas por el sistema</strong> (según las estadísticas de cada jugador: % de victorias y el historial entre ambos si ya han jugado antes). Solo informativo — todavía no se puede apostar. Se cierra solo a los 5 segundos, o con la ✕.</p>
+      <div class="reglas-item" data-tema="2">
+        <button class="reglas-item-cabecera"><span>📊 Antes de empezar</span><span class="reglas-flecha">▾</span></button>
+        <div class="reglas-item-cuerpo oculto">
+          <p>Aparece un aviso con las <strong>cuotas calculadas por el sistema</strong> (según las estadísticas de cada jugador: % de victorias y el historial entre ambos si ya han jugado antes). Solo informativo — todavía no se puede apostar. Se queda visible hasta que lo cierras con la <strong>✕</strong>.</p>
+        </div>
+      </div>
 
-      <h3>🔄 Quién saca</h3>
-      <ul>
-        <li>Al empezar el partido, elegís cómo decidirlo: <strong>lanzar la moneda</strong>, o jugar una pelota corta y <strong>elegir a mano</strong> quién la ganó. Solo se decide así en el <strong>primer juego</strong>.</li>
-        <li>El saque cambia cada <strong>2, 3 o 5 puntos</strong> (se elige al configurar el partido, 3 por defecto).</li>
-        <li>Cuando alguien llega a <strong>10 puntos</strong> (si se juega a 11) o a <strong>20</strong> (si se juega a 21), se puede acabar la rotación: a partir de ahí <strong>saca siempre el que va perdiendo</strong>, hasta el final del juego. Esta regla también se puede desactivar al configurar el partido.</li>
-        <li>Desde el <strong>segundo juego</strong> en adelante, siempre saca primero quien <strong>perdió el juego anterior</strong> — ya no se vuelve a elegir.</li>
-      </ul>
-      <p class="nota">🔊 Con el aviso de voz activado, la tablet dice en alto "Saca [nombre]" cada vez que cambia el saque, para poder jugar sin mirar la pantalla.</p>
+      <div class="reglas-item" data-tema="3">
+        <button class="reglas-item-cabecera"><span>🔄 Quién saca</span><span class="reglas-flecha">▾</span></button>
+        <div class="reglas-item-cuerpo oculto">
+          <ul>
+            <li>Al empezar el partido, elegís cómo decidirlo: <strong>lanzar la moneda</strong>, o jugar una pelota corta y <strong>elegir a mano</strong> quién la ganó. Solo se decide así en el <strong>primer juego</strong>.</li>
+            <li>El saque cambia cada <strong>2, 3 o 5 puntos</strong> (se elige al configurar el partido, 3 por defecto).</li>
+            <li>Cuando alguien llega a <strong>10 puntos</strong> (si se juega a 11) o a <strong>20</strong> (si se juega a 21), se puede acabar la rotación: a partir de ahí <strong>saca siempre el que va perdiendo</strong>, hasta el final del juego. Esta regla también se puede desactivar al configurar el partido.</li>
+            <li>Desde el <strong>segundo juego</strong> en adelante, siempre saca primero quien <strong>perdió el juego anterior</strong> — ya no se vuelve a elegir.</li>
+          </ul>
+          <p class="nota">🔊 Con el aviso de voz activado, la tablet dice en alto "Saca [nombre]" cada vez que cambia el saque, para poder jugar sin mirar la pantalla.</p>
+        </div>
+      </div>
 
-      <h3>🏅 Cómo se gana un juego</h3>
-      <p>Gana quien llega antes a <strong>11 puntos</strong> (o a 21, según lo elegido), pero <strong>siempre con 2 de diferencia</strong>. Si van 10-10, hay que seguir hasta sacar dos: 12-10, 13-11…</p>
+      <div class="reglas-item" data-tema="4">
+        <button class="reglas-item-cabecera"><span>🏅 Cómo se gana un juego</span><span class="reglas-flecha">▾</span></button>
+        <div class="reglas-item-cuerpo oculto">
+          <p>Gana quien llega antes a <strong>11 puntos</strong> (o a 21, según lo elegido), pero <strong>siempre con 2 de diferencia</strong>. Si van 10-10, hay que seguir hasta sacar dos: 12-10, 13-11…</p>
+        </div>
+      </div>
 
-      <h3>🏆 Cómo se gana el partido</h3>
-      <p>Depende de lo elegido al crear el torneo: <strong>juego único</strong>, <strong>mejor de 3</strong> (gana quien llegue a 2 juegos) o <strong>mejor de 5</strong> (a 3 juegos).</p>
+      <div class="reglas-item" data-tema="5">
+        <button class="reglas-item-cabecera"><span>🏆 Cómo se gana el partido</span><span class="reglas-flecha">▾</span></button>
+        <div class="reglas-item-cuerpo oculto">
+          <p>Depende de lo elegido al crear el torneo: <strong>juego único</strong>, <strong>mejor de 3</strong> (gana quien llegue a 2 juegos) o <strong>mejor de 5</strong> (a 3 juegos).</p>
+        </div>
+      </div>
 
-      <h3>📊 Cómo funciona el torneo</h3>
-      <ul>
-        <li>Es una <strong>liguilla</strong>: todos juegan contra todos. <strong>Nadie descansa ni pasa gratis.</strong></li>
-        <li>Los emparejamientos salen <strong>al azar</strong> y se reparten en <strong>jornadas</strong>.</li>
-        <li>La <strong>clasificación se actualiza sola</strong> después de cada partido.</li>
-        <li>Gana el torneo quien tenga <strong>más partidos ganados</strong>. Si hay empate, decide la <strong>diferencia de juegos</strong>; y si sigue el empate, la <strong>diferencia de puntos</strong>.</li>
-      </ul>
+      <div class="reglas-item" data-tema="6">
+        <button class="reglas-item-cabecera"><span>📊 Cómo funciona el torneo</span><span class="reglas-flecha">▾</span></button>
+        <div class="reglas-item-cuerpo oculto">
+          <ul>
+            <li>Es una <strong>liguilla</strong>: todos juegan contra todos. <strong>Nadie descansa ni pasa gratis.</strong></li>
+            <li>Los emparejamientos salen <strong>al azar</strong> y se reparten en <strong>jornadas</strong>.</li>
+            <li>La <strong>clasificación se actualiza sola</strong> después de cada partido.</li>
+            <li>Gana el torneo quien tenga <strong>más partidos ganados</strong>. Si hay empate, decide la <strong>diferencia de juegos</strong>; y si sigue el empate, la <strong>diferencia de puntos</strong>.</li>
+          </ul>
+        </div>
+      </div>
 
-      <h3>⚡ Botones útiles durante el partido</h3>
-      <ul>
-        <li><strong>Cambiar de campo:</strong> intercambia los lados cuando los jugadores se cambian de sitio en la mesa. Los puntos siguen a cada jugador, no se pierde nada.</li>
-        <li><strong>Deshacer último punto:</strong> por si te has equivocado al tocar.</li>
-        <li><span class="led-net encendido" style="width:8px;height:8px;"></span> <strong>Red (repetir punto):</strong> si el saque toca la red, tócalo — se enciende una luz y aparece el aviso "¡RED!" para que se repita el punto. No cambia el marcador solo.</li>
-        <li><strong>⏸️ Pausar y guardar:</strong> el partido queda guardado en esta tablet tal cual está; aparece en la portada en "Partidos en pausa" para retomarlo más tarde exactamente donde se dejó.</li>
-        <li><strong>Pantalla completa:</strong> los números se hacen enormes para verlos desde la mesa.</li>
-      </ul>
+      <div class="reglas-item" data-tema="7">
+        <button class="reglas-item-cabecera"><span>⚡ Botones útiles durante el partido</span><span class="reglas-flecha">▾</span></button>
+        <div class="reglas-item-cuerpo oculto">
+          <ul>
+            <li><strong>Cambiar de campo:</strong> intercambia los lados cuando los jugadores se cambian de sitio en la mesa. Los puntos siguen a cada jugador, no se pierde nada.</li>
+            <li><strong>Deshacer último punto:</strong> por si te has equivocado al tocar.</li>
+            <li><span class="led-net encendido" style="width:8px;height:8px;"></span> <strong>Red (repetir punto):</strong> si el saque toca la red, tócalo — se enciende una luz y aparece el aviso "¡RED!" para que se repita el punto. No cambia el marcador solo.</li>
+            <li><strong>⏸️ Pausar y guardar:</strong> el partido queda guardado en esta tablet tal cual está; aparece en la portada en "Partidos en pausa" para retomarlo más tarde exactamente donde se dejó.</li>
+            <li><strong>Pantalla completa:</strong> los números se hacen enormes para verlos desde la mesa.</li>
+          </ul>
+        </div>
+      </div>
 
-      <h3>🪙 Puntos y PitCoin</h3>
-      <ul>
-        <li>Cada partido jugado da <strong>puntos en su categoría</strong>: 🏓 Single (partida suelta), 🔄 Liguilla, 🏆 Eliminatoria o 🎖️ Liga. Ganar da más puntos que perder.</li>
-        <li><strong>PitCoin</strong> es la suma de los puntos de las 4 categorías — el número "general" de cada jugador. Se ve en su ficha (botón 📊) y en el <strong>Ranking</strong>, que tiene dos vistas: la clasificación por medallas de torneo, y la de PitCoin.</li>
-        <li>De momento el PitCoin solo se gana jugando; todavía no se puede gastar ni apostar.</li>
-      </ul>
+      <div class="reglas-item" data-tema="8">
+        <button class="reglas-item-cabecera"><span>🪙 Puntos y PitCoin</span><span class="reglas-flecha">▾</span></button>
+        <div class="reglas-item-cuerpo oculto">
+          <ul>
+            <li>Cada partido jugado da <strong>puntos en su categoría</strong>: 🏓 Single (partida suelta), 🔄 Liguilla, 🏆 Eliminatoria o 🎖️ Liga. Ganar da más puntos que perder.</li>
+            <li><strong>PitCoin</strong> es la suma de los puntos de las 4 categorías — el número "general" de cada jugador. Se ve en su ficha (botón 📊) y en el <strong>Ranking</strong>, que tiene dos vistas: la clasificación por medallas de torneo, y la de PitCoin.</li>
+            <li>De momento el PitCoin solo se gana jugando; todavía no se puede gastar ni apostar.</li>
+          </ul>
+        </div>
+      </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- Detalle de puntos: reglas de la categoría + histórico, a un clic desde cada badge en Jugadores y estadísticas -->
+<div id="detalle-puntos-overlay" class="reglas-overlay oculto">
+  <div class="reglas-caja">
+    <div class="reglas-cabecera">
+      <h2 id="detalle-puntos-titulo">🪙 Puntos</h2>
+      <button class="btn ghost small" id="btn-cerrar-detalle-puntos">✕ Cerrar</button>
+    </div>
+    <div class="reglas-cuerpo">
+      <div id="detalle-puntos-regla"></div>
+      <div class="stats-titulo" style="margin-top:12px;">Histórico</div>
+      <div id="detalle-puntos-historial"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Cuenta con PIN: accesible desde cualquier pantalla vía el botón 🔑 de la portada -->
+<div id="login-overlay" class="moneda-overlay oculto">
+  <div class="moneda-caja" style="max-width:380px;">
+    <button class="btn ghost small" id="btn-cerrar-login" style="position:absolute;top:12px;right:12px;">✕</button>
+    <div class="moneda-titulo">🔑 Mi cuenta</div>
+
+    <div id="login-paso-nombre">
+      <p class="nota">Escribe tu nombre tal como está registrado en "Jugadores y estadísticas".</p>
+      <input type="text" id="login-input-nombre" list="login-lista-nombres" placeholder="Tu nombre" maxlength="30" style="width:100%;margin-bottom:10px;">
+      <datalist id="login-lista-nombres"></datalist>
+      <div id="login-error-nombre" class="nota" style="color:var(--rojo);min-height:1.2em;"></div>
+      <button class="btn dorado" id="btn-login-continuar" style="width:100%;">Continuar</button>
+    </div>
+
+    <div id="login-paso-pin" class="oculto">
+      <p class="nota">Hola, <strong id="login-nombre-verificar"></strong>. Introduce tu PIN.</p>
+      <input type="password" inputmode="numeric" id="login-input-pin" placeholder="PIN" maxlength="12" style="width:100%;margin-bottom:10px;">
+      <div id="login-error-pin" class="nota" style="color:var(--rojo);min-height:1.2em;"></div>
+      <button class="btn dorado" id="btn-login-verificar" style="width:100%;">Entrar</button>
+      <button class="btn ghost small" id="btn-login-volver-1" style="margin-top:8px;">← No soy yo</button>
+    </div>
+
+    <div id="login-paso-crear" class="oculto">
+      <p class="nota">Hola, <strong id="login-nombre-crear"></strong>. Todavía no tienes PIN: créalo ahora (mínimo 4 caracteres) para verificar tu cuenta.</p>
+      <input type="password" inputmode="numeric" id="login-input-pin1" placeholder="Nuevo PIN" maxlength="12" style="width:100%;margin-bottom:8px;">
+      <input type="password" inputmode="numeric" id="login-input-pin2" placeholder="Repite el PIN" maxlength="12" style="width:100%;margin-bottom:10px;">
+      <div id="login-error-crear" class="nota" style="color:var(--rojo);min-height:1.2em;"></div>
+      <button class="btn verde-claro" id="btn-login-crear" style="width:100%;">Crear PIN y entrar</button>
+      <button class="btn ghost small" id="btn-login-volver-2" style="margin-top:8px;">← No soy yo</button>
+    </div>
+
+    <div id="login-paso-ok" class="oculto">
+      <p class="nota">✅ Sesión iniciada como <strong id="login-nombre-ok"></strong>.</p>
+      <button class="btn dorado" id="btn-login-cerrar-ok" style="width:100%;">Listo</button>
     </div>
   </div>
 </div>
@@ -934,6 +1053,7 @@
     <div class="home-controles">
       <button class="icon-btn-home btn-reglas" title="Reglas del juego">?</button>
       <button class="icon-btn-home" id="btn-recargar-online" title="Actualizar datos">🔄</button>
+      <button class="icon-btn-home" id="btn-cuenta" title="Iniciar sesión / crear cuenta">🔑</button>
       <button class="icon-btn-home btn-fullscreen" title="Pantalla completa"></button>
     </div>
     <div class="home-wrap">
@@ -945,8 +1065,10 @@
         <div class="home-campeon oculto" id="home-campeon"></div>
         <div class="home-pausas oculto" id="home-pausas"></div>
         <div class="fila" style="justify-content:center;margin-top:6px;">
-          <button class="btn dorado" id="btn-jugar-rapido" style="font-size:1.3rem;padding:18px 28px;">🏓 Jugar partido</button>
-          <button class="btn verde-claro" id="btn-ligas" style="font-size:1rem;padding:12px 24px;">🏅 Ligas</button>
+          <button class="btn verde-claro btn-primario-pulso" id="btn-jugar-rapido" style="font-size:1.3rem;padding:18px 28px;">🏓 Jugar partido</button>
+        </div>
+        <div class="fila" style="justify-content:center;margin-top:10px;">
+          <button class="btn dorado" id="btn-ligas" style="font-size:1rem;padding:12px 24px;">🏅 Ligas</button>
           <button class="btn madera" id="btn-ranking" style="font-size:1rem;padding:12px 24px;">📊 Ranking</button>
         </div>
       </div>
@@ -1004,15 +1126,18 @@
       <div class="fila">
         <div style="flex:1;min-width:140px;">
           <label>Puntos por juego</label>
-          <input type="number" id="input-puntos-juego" value="11" min="5" max="21">
+          <div class="fila toggle-grupo" id="toggle-puntos-torneo">
+            <button class="btn toggle-opcion activo" data-puntos="11" style="flex:1;">11 puntos</button>
+            <button class="btn toggle-opcion" data-puntos="21" style="flex:1;">21 puntos</button>
+          </div>
         </div>
         <div style="flex:1;min-width:140px;">
-          <label>Formato del partido</label>
-          <select id="input-sets" style="width:100%;padding:11px 12px;border-radius:8px;border:2px solid var(--madera);min-height:44px;font-size:1rem;">
-            <option value="1">Al mejor juego único</option>
-            <option value="2" selected>Mejor de 3 juegos</option>
-            <option value="3">Mejor de 5 juegos</option>
-          </select>
+          <label>Cómo se gana el partido</label>
+          <div class="fila toggle-grupo" id="toggle-sets-torneo">
+            <button class="btn toggle-opcion" data-sets="1" style="flex:1;">Juego único</button>
+            <button class="btn toggle-opcion activo" data-sets="2" style="flex:1;">Mejor de 3</button>
+            <button class="btn toggle-opcion" data-sets="3" style="flex:1;">Mejor de 5</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1294,13 +1419,14 @@
     <div class="net-aviso oculto" id="net-aviso">🌐 ¡RED!<br><span>Se repite el punto</span></div>
   </main>
 
-  <!-- Cuotas previas: se ve antes del sorteo, informativo, se cierra sola -->
+  <!-- Cuotas previas: se ve antes del sorteo, informativo. Se queda visible
+       hasta que se cierra con la ✕ a propósito — es para leerla con calma. -->
   <div id="odds-overlay" class="moneda-overlay oculto">
     <div class="moneda-caja">
       <button class="btn ghost small" id="btn-cerrar-odds" style="position:absolute;top:12px;right:12px;">✕</button>
       <div class="moneda-titulo">📊 Antes de empezar</div>
       <div id="odds-contenido"></div>
-      <p class="nota" style="margin-top:10px;">Cuotas calculadas por el sistema a partir de las estadísticas de cada jugador. Solo informativo — todavía no se puede apostar.</p>
+      <p class="nota" style="margin-top:10px;">Cuotas calculadas por el sistema a partir de las <strong>estadísticas reales</strong> de cada jugador. Solo informativo — todavía no se puede apostar.</p>
     </div>
   </div>
 
@@ -1959,9 +2085,52 @@
   function badgesPuntosHtml(id){
     const c = calcularPuntosPorCategoria(id);
     return CATEGORIAS_PUNTOS.map(cat=>
-      '<span class="badge-puntos" title="Puntos de '+cat.nombre+'">'+cat.icono+' '+cat.nombre+' <strong>'+c[cat.key]+'</strong></span>'
-    ).join("") + '<span class="badge-puntos badge-pitcoin" title="PitCoin: puntos de las 4 categorías sumados">🪙 PitCoin <strong>'+calcularPitcoin(id)+'</strong></span>';
+      '<button class="badge-puntos" data-detalle-jugador="'+id+'" data-detalle-cat="'+cat.key+'" title="Ver reglas e histórico de '+cat.nombre+'">'+cat.icono+' '+cat.nombre+' <strong>'+c[cat.key]+'</strong></button>'
+    ).join("") + '<button class="badge-puntos badge-pitcoin" data-detalle-jugador="'+id+'" data-detalle-cat="pitcoin" title="Ver cómo se calcula el PitCoin">🪙 PitCoin <strong>'+calcularPitcoin(id)+'</strong></button>';
   }
+
+  /* Reglas de puntos por categoría + histórico filtrado: contenido del
+     modal que abre cada badge de badgesPuntosHtml (un clic, siempre). */
+  const REGLAS_PUNTOS_CATEGORIA = {
+    single: "Cada <strong>partida suelta</strong> (1 vs 1 o 2 vs 2) que juegues da <strong>1 punto</strong>. Si la ganas, sumas <strong>2 puntos extra</strong> (3 en total).",
+    liguilla: "Cada partido de una <strong>liguilla</strong> (torneo con calendario y cuadro, todos contra todos) da <strong>1 punto</strong> por jugarlo y <strong>3</strong> si lo ganas.",
+    eliminatoria: "Cada partido de un <strong>cuadro eliminatorio</strong> (formato de rondas) da <strong>1 punto</strong> por jugarlo y <strong>3</strong> si lo ganas.",
+    liga: "Cada partido de una <strong>liga</strong> (clasificación permanente, sin calendario fijo) da <strong>1 punto</strong> por jugarlo y <strong>3</strong> si lo ganas.",
+    pitcoin: "<strong>PitCoin</strong> es la suma de tus puntos en las 4 categorías: Single + Liguilla + Eliminatoria + Liga. De momento solo se gana jugando — todavía no se puede gastar ni apostar."
+  };
+  function historialFiltradoHtml(id, catKey){
+    const todos = partidosDeJugador(id);
+    const partidos = catKey === "pitcoin" ? todos : todos.filter(x=>x.categoria===catKey);
+    if(!partidos.length) return '<div class="home-stats">Todavía no hay partidos en esta categoría.</div>';
+    const pg = partidos.filter(x=>x.gano).length;
+    return '<div class="home-stats" style="margin-bottom:8px;">'+partidos.length+' partido(s) — '+
+      '<strong style="color:#2e7d4f;">'+pg+' ganado(s)</strong>, '+
+      '<strong style="color:#b0503c;">'+(partidos.length-pg)+' perdido(s)</strong></div>'+
+      '<div class="stats-historial">'+
+      partidos.map(x=>
+        '<div class="stats-partido">'+
+          '<span class="res '+(x.gano?"v":"d")+'">'+(x.gano?"✓":"✗")+'</span>'+
+          '<span class="detalle">vs '+escapeHtml(x.rival)+
+            '<span class="comp">'+escapeHtml(x.comp)+(x.fecha ? ' · '+formatDate(x.fecha) : '')+'</span></span>'+
+          (x.marcador ? '<span class="marcador">'+escapeHtml(x.marcador)+
+            (x.parciales ? ' <span class="parciales">('+escapeHtml(x.parciales)+')</span>' : '')+'</span>' : '')+
+        '</div>'
+      ).join("")+
+    '</div>';
+  }
+  function abrirDetallePuntos(jugadorId, catKey){
+    const cat = CATEGORIAS_PUNTOS.find(c=>c.key===catKey) || {icono:"🪙", nombre:"PitCoin"};
+    document.getElementById("detalle-puntos-titulo").textContent = cat.icono+" "+cat.nombre+" — "+playerName(jugadorId);
+    document.getElementById("detalle-puntos-regla").innerHTML = "<p>"+(REGLAS_PUNTOS_CATEGORIA[catKey]||"")+"</p>";
+    document.getElementById("detalle-puntos-historial").innerHTML = historialFiltradoHtml(jugadorId, catKey);
+    document.getElementById("detalle-puntos-overlay").classList.remove("oculto");
+  }
+  document.getElementById("btn-cerrar-detalle-puntos").addEventListener("click", ()=>{
+    document.getElementById("detalle-puntos-overlay").classList.add("oculto");
+  });
+  document.getElementById("detalle-puntos-overlay").addEventListener("click", (e)=>{
+    if(e.target.id === "detalle-puntos-overlay") e.target.classList.add("oculto");
+  });
   // Partidos jugados en total en el club (torneos + ligas + sueltos), para
   // que el ranking dé también una foto del pulso general, no solo de cada
   // jugador por separado.
@@ -2217,7 +2386,9 @@
           '<button class="avatar-boton" data-foto="'+p.id+'" title="Cambiar foto">'+
             avatarHtml(p.id, 44)+'<span class="avatar-camara">📷</span>'+
           '</button>'+
-          '<div class="jugador-nombre">'+nombreConPos(p.id)+'</div>'+
+          '<div class="jugador-nombre">'+nombreConPos(p.id)+
+            (p.tieneCuenta ? ' <span class="badge-verificado" title="Tiene PIN creado">✅ verificado</span>' : '')+
+          '</div>'+
           '<button class="btn small'+(statsJugadorId===p.id?' dorado':'')+'" data-stats="'+p.id+'">📊</button>'+
           (p.photo ? '<button class="btn ghost small" data-quitar-foto="'+p.id+'">Quitar foto</button>' : '')+
           '<button class="btn madera small" data-editar="'+p.id+'">Editar</button>'+
@@ -2235,6 +2406,11 @@
         const id = btn.getAttribute("data-stats");
         statsJugadorId = (statsJugadorId === id) ? null : id;
         renderJugadores();
+      });
+    });
+    cont.querySelectorAll("[data-detalle-jugador]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        abrirDetallePuntos(btn.getAttribute("data-detalle-jugador"), btn.getAttribute("data-detalle-cat"));
       });
     });
     cont.querySelectorAll("[data-foto]").forEach(btn=>{
@@ -2331,6 +2507,8 @@
   let seleccionados = new Set();
   let saqueTorneo = 3;
   let ventajaTorneo = true;
+  let puntosTorneo = 11;
+  let setsTorneo = 2;
 
   // El texto y el estado visual del check de ventaja se comparten entre las
   // tres pantallas de configuración (torneo, liga y partida suelta).
@@ -2378,11 +2556,13 @@
     seleccionados = new Set();
     saqueTorneo = 3;
     ventajaTorneo = true;
+    puntosTorneo = 11;
+    setsTorneo = 2;
     pintarToggleSaque("toggle-saque-torneo", saqueTorneo);
-    pintarCheckVentaja("torneo", ventajaTorneo, parseInt(document.getElementById("input-puntos-juego").value,10) || 11);
+    pintarCheckVentaja("torneo", ventajaTorneo, puntosTorneo);
     document.getElementById("input-nombre-torneo").value = "";
-    document.getElementById("input-puntos-juego").value = 11;
-    document.getElementById("input-sets").value = "2";
+    document.querySelectorAll("#toggle-puntos-torneo .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.puntos===String(puntosTorneo)));
+    document.querySelectorAll("#toggle-sets-torneo .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.sets===String(setsTorneo)));
     document.getElementById("input-jugador-torneo").value = "";
     pintarChecklistCrear();
     document.getElementById("check-todos").checked = false;
@@ -2434,16 +2614,26 @@
   });
   document.getElementById("check-ventaja-torneo").addEventListener("click", ()=>{
     ventajaTorneo = !ventajaTorneo;
-    pintarCheckVentaja("torneo", ventajaTorneo, parseInt(document.getElementById("input-puntos-juego").value,10) || 11);
+    pintarCheckVentaja("torneo", ventajaTorneo, puntosTorneo);
   });
-  document.getElementById("input-puntos-juego").addEventListener("input", ()=>{
-    pintarCheckVentaja("torneo", ventajaTorneo, parseInt(document.getElementById("input-puntos-juego").value,10) || 11);
+  document.querySelectorAll("#toggle-puntos-torneo .toggle-opcion").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      puntosTorneo = parseInt(btn.dataset.puntos,10);
+      document.querySelectorAll("#toggle-puntos-torneo .toggle-opcion").forEach(b=>b.classList.toggle("activo", b===btn));
+      pintarCheckVentaja("torneo", ventajaTorneo, puntosTorneo);
+    });
+  });
+  document.querySelectorAll("#toggle-sets-torneo .toggle-opcion").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      setsTorneo = parseInt(btn.dataset.sets,10);
+      document.querySelectorAll("#toggle-sets-torneo .toggle-opcion").forEach(b=>b.classList.toggle("activo", b===btn));
+    });
   });
 
   document.getElementById("btn-generar-torneo").addEventListener("click", ()=>{
     const nombre = document.getElementById("input-nombre-torneo").value.trim() || "Torneo sin nombre";
-    const puntos = Math.max(5, parseInt(document.getElementById("input-puntos-juego").value,10) || 11);
-    const setsToWin = parseInt(document.getElementById("input-sets").value,10);
+    const puntos = puntosTorneo;
+    const setsToWin = setsTorneo;
     const ids = Array.from(seleccionados);
     if(ids.length < 2){ alert("Selecciona al menos 2 jugadores."); return; }
     const t = crearTorneo(nombre, ids, puntos, setsToWin, saqueTorneo, ventajaTorneo);
@@ -3503,9 +3693,43 @@
     el.addEventListener("change", renderHistorial);
   });
 
-  /* ===================== REGLAS (accesibles desde cualquier pantalla) ===================== */
+  /* ===================== REGLAS (accesibles desde cualquier pantalla) =====================
+     Acordeón por tema (cada uno profundiza sólo en lo que le interesa) +
+     buscador que abre y muestra sólo los temas que coinciden. */
+  document.querySelectorAll(".reglas-item-cabecera").forEach(cab=>{
+    cab.addEventListener("click", ()=>{
+      const item = cab.closest(".reglas-item");
+      const abierto = item.classList.toggle("abierto");
+      item.querySelector(".reglas-item-cuerpo").classList.toggle("oculto", !abierto);
+    });
+  });
+  function filtrarReglas(){
+    const q = normalizarBusqueda(document.getElementById("reglas-buscador").value.trim());
+    let algunaVisible = false;
+    document.querySelectorAll(".reglas-item").forEach(item=>{
+      const coincide = !q || normalizarBusqueda(item.textContent).includes(q);
+      item.classList.toggle("oculto-busqueda", !coincide);
+      if(coincide) algunaVisible = true;
+      // Con búsqueda activa, se abren solos los temas que coinciden para
+      // no obligar a tocar cada uno; al borrar el texto vuelven a cerrarse.
+      const cuerpo = item.querySelector(".reglas-item-cuerpo");
+      const abrir = q && coincide;
+      item.classList.toggle("abierto", !!abrir);
+      cuerpo.classList.toggle("oculto", !abrir);
+    });
+    document.getElementById("reglas-sin-resultados").classList.toggle("oculto", algunaVisible || !q);
+  }
+  document.getElementById("reglas-buscador").addEventListener("input", filtrarReglas);
+
   document.querySelectorAll(".btn-reglas").forEach(btn=>{
     btn.addEventListener("click", ()=>{
+      // Cada apertura empieza limpia: sin búsqueda y todos los temas cerrados.
+      document.getElementById("reglas-buscador").value = "";
+      document.querySelectorAll(".reglas-item").forEach(item=>{
+        item.classList.remove("abierto","oculto-busqueda");
+        item.querySelector(".reglas-item-cuerpo").classList.add("oculto");
+      });
+      document.getElementById("reglas-sin-resultados").classList.add("oculto");
       document.getElementById("reglas-overlay").classList.remove("oculto");
     });
   });
@@ -3536,19 +3760,22 @@
     const cont = document.getElementById("odds-contenido");
     cont.innerHTML = '<div class="odds-filas">'+
       '<div class="odds-fila'+(probA>=probB?' favorito':'')+'">'+
+        (probA>=probB ? '<div class="odds-tag">⭐ Favorito</div>' : '')+
         '<div class="odds-nombre">'+escapeHtml(scorerState.a.label)+'</div>'+
         '<div class="odds-prob">'+Math.round(probA*100)+'%</div>'+
-        '<div class="odds-cuota">Cuota '+cuotaDecimal(probA)+'</div>'+
+        '<div class="odds-cuota">Cuota <strong>'+cuotaDecimal(probA)+'</strong></div>'+
       '</div>'+
       '<div class="odds-fila'+(probB>probA?' favorito':'')+'">'+
+        (probB>probA ? '<div class="odds-tag">⭐ Favorito</div>' : '')+
         '<div class="odds-nombre">'+escapeHtml(scorerState.b.label)+'</div>'+
         '<div class="odds-prob">'+Math.round(probB*100)+'%</div>'+
-        '<div class="odds-cuota">Cuota '+cuotaDecimal(probB)+'</div>'+
+        '<div class="odds-cuota">Cuota <strong>'+cuotaDecimal(probB)+'</strong></div>'+
       '</div>'+
     '</div>';
     document.getElementById("odds-overlay").classList.remove("oculto");
+    // A propósito SIN auto-cierre: Marco quiere poder leerla con calma y
+    // cerrarla él mismo con la ✕ (antes se cerraba sola a los 5s).
     clearTimeout(oddsTimeout);
-    oddsTimeout = setTimeout(()=>cerrarOddsPrevias(siguiente), 5000);
   }
   function cerrarOddsPrevias(siguiente){
     clearTimeout(oddsTimeout);
@@ -4391,6 +4618,172 @@
     }
     localStorage.setItem(FLAG, "1");
   })();
+
+  /* ===================== CUENTA CON PIN =====================
+     Sistema propio de Pit Pong (Sheet propio, salt propio) inspirado en el
+     login de Academy, pero con una corrección de seguridad obligatoria: el
+     hash del PIN se compara SIEMPRE en el backend (verificarPin/crearPin
+     en Codigo.gs) — este cliente nunca recibe la lista de hashes, sólo un
+     booleano "tieneCuenta" por jugador y, al verificar el suyo, ok/error.
+     El hash se calcula sobre el ID interno del jugador, no su nombre: así
+     renombrarlo no invalida el PIN ya creado. Sesión simple en
+     sessionStorage (sin token ni expiración), como en el original. */
+  const PIN_SALT = "pitpong-csc-2026"; // salt público propio de Pit Pong, no compartido con Academy
+  async function hashPin(jugadorId, pin){
+    const raw = PIN_SALT + ":" + jugadorId + ":" + pin;
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+  }
+
+  const LOGIN_SESSION_KEY = "pitpong_sesion";
+  function sesionActual(){
+    try{ return JSON.parse(sessionStorage.getItem(LOGIN_SESSION_KEY)); }catch(e){ return null; }
+  }
+  function guardarSesion(jugadorId){
+    sessionStorage.setItem(LOGIN_SESSION_KEY, JSON.stringify({jugadorId, nombre: playerName(jugadorId)}));
+  }
+  function cerrarSesion(){
+    sessionStorage.removeItem(LOGIN_SESSION_KEY);
+    pintarBotonCuenta();
+  }
+  function pintarBotonCuenta(){
+    const btn = document.getElementById("btn-cuenta");
+    const s = sesionActual();
+    btn.textContent = s ? "👤" : "🔑";
+    btn.title = s ? "Sesión: "+s.nombre+" (toca para cerrar sesión)" : "Iniciar sesión / crear cuenta";
+  }
+
+  let loginJugadorId = null;
+  function pasoLogin(paso){
+    ["nombre","pin","crear","ok"].forEach(p=>{
+      document.getElementById("login-paso-"+p).classList.toggle("oculto", p!==paso);
+    });
+  }
+  function abrirLogin(){
+    const s = sesionActual();
+    if(s){
+      if(confirm("Sesión iniciada como "+s.nombre+". ¿Cerrar sesión?")) cerrarSesion();
+      return;
+    }
+    loginJugadorId = null;
+    document.getElementById("login-input-nombre").value = "";
+    document.getElementById("login-error-nombre").textContent = "";
+    document.getElementById("login-lista-nombres").innerHTML =
+      players.map(p=>'<option value="'+escapeHtml(p.name)+'">').join("");
+    pasoLogin("nombre");
+    document.getElementById("login-overlay").classList.remove("oculto");
+  }
+  function cerrarLogin(){
+    document.getElementById("login-overlay").classList.add("oculto");
+  }
+  document.getElementById("btn-cuenta").addEventListener("click", abrirLogin);
+  document.getElementById("btn-cerrar-login").addEventListener("click", cerrarLogin);
+  document.getElementById("login-overlay").addEventListener("click", (e)=>{
+    if(e.target.id === "login-overlay") cerrarLogin();
+  });
+  document.getElementById("btn-login-volver-1").addEventListener("click", ()=>pasoLogin("nombre"));
+  document.getElementById("btn-login-volver-2").addEventListener("click", ()=>pasoLogin("nombre"));
+  document.getElementById("btn-login-cerrar-ok").addEventListener("click", cerrarLogin);
+
+  document.getElementById("btn-login-continuar").addEventListener("click", async ()=>{
+    const nombre = document.getElementById("login-input-nombre").value.trim();
+    const errEl = document.getElementById("login-error-nombre");
+    errEl.textContent = "";
+    if(!nombre) return;
+    const jugador = players.find(p=>normalizarBusqueda(p.name)===normalizarBusqueda(nombre));
+    if(!jugador){
+      errEl.textContent = "No encontramos a nadie con ese nombre. Dalo de alta antes en \"Jugadores y estadísticas\".";
+      return;
+    }
+    if(!hayBackend()){
+      errEl.textContent = "Sin conexión al servidor: no se puede verificar la cuenta ahora mismo.";
+      return;
+    }
+    loginJugadorId = jugador.id;
+    const btn = document.getElementById("btn-login-continuar");
+    btn.disabled = true; btn.textContent = "Comprobando…";
+    try{
+      // Recargamos del servidor para no fiarnos de un "tieneCuenta" local
+      // desactualizado (p.ej. si creó el PIN hace un momento en otra tablet).
+      await cargarDelServidor();
+      const actualizado = players.find(p=>p.id===jugador.id) || jugador;
+      if(actualizado.tieneCuenta){
+        document.getElementById("login-nombre-verificar").textContent = actualizado.name;
+        document.getElementById("login-input-pin").value = "";
+        document.getElementById("login-error-pin").textContent = "";
+        pasoLogin("pin");
+      } else {
+        document.getElementById("login-nombre-crear").textContent = actualizado.name;
+        document.getElementById("login-input-pin1").value = "";
+        document.getElementById("login-input-pin2").value = "";
+        document.getElementById("login-error-crear").textContent = "";
+        pasoLogin("crear");
+      }
+    }catch(e){
+      errEl.textContent = "No se pudo comprobar la cuenta. Prueba otra vez.";
+    }finally{
+      btn.disabled = false; btn.textContent = "Continuar";
+    }
+  });
+  document.getElementById("login-input-nombre").addEventListener("keydown", e=>{
+    if(e.key==="Enter") document.getElementById("btn-login-continuar").click();
+  });
+
+  document.getElementById("btn-login-verificar").addEventListener("click", async ()=>{
+    const pin = document.getElementById("login-input-pin").value;
+    const errEl = document.getElementById("login-error-pin");
+    errEl.textContent = "";
+    if(!pin){ errEl.textContent = "Escribe tu PIN."; return; }
+    const btn = document.getElementById("btn-login-verificar");
+    btn.disabled = true; btn.textContent = "Comprobando…";
+    try{
+      const hash = await hashPin(loginJugadorId, pin);
+      const resp = await llamarApi({accion:"verificarPin", jugadorId: loginJugadorId, hash});
+      if(resp.valido){
+        guardarSesion(loginJugadorId);
+        document.getElementById("login-nombre-ok").textContent = playerName(loginJugadorId);
+        pintarBotonCuenta();
+        pasoLogin("ok");
+      } else {
+        errEl.textContent = "PIN incorrecto.";
+      }
+    }catch(e){
+      errEl.textContent = e.message || "No se pudo verificar el PIN. Prueba otra vez.";
+    }finally{
+      btn.disabled = false; btn.textContent = "Entrar";
+    }
+  });
+  document.getElementById("login-input-pin").addEventListener("keydown", e=>{
+    if(e.key==="Enter") document.getElementById("btn-login-verificar").click();
+  });
+
+  document.getElementById("btn-login-crear").addEventListener("click", async ()=>{
+    const pin1 = document.getElementById("login-input-pin1").value;
+    const pin2 = document.getElementById("login-input-pin2").value;
+    const errEl = document.getElementById("login-error-crear");
+    errEl.textContent = "";
+    if(pin1.length < 4){ errEl.textContent = "El PIN debe tener al menos 4 caracteres."; return; }
+    if(pin1 !== pin2){ errEl.textContent = "Los dos PIN no coinciden."; return; }
+    const btn = document.getElementById("btn-login-crear");
+    btn.disabled = true; btn.textContent = "Creando…";
+    try{
+      const hash = await hashPin(loginJugadorId, pin1);
+      await llamarApi({accion:"crearPin", jugadorId: loginJugadorId, hash});
+      guardarSesion(loginJugadorId);
+      const jugador = players.find(p=>p.id===loginJugadorId);
+      if(jugador){ jugador.tieneCuenta = true; savePlayers(players); }
+      document.getElementById("login-nombre-ok").textContent = playerName(loginJugadorId);
+      pintarBotonCuenta();
+      if(currentView === "jugadores") renderJugadores();
+      pasoLogin("ok");
+    }catch(e){
+      errEl.textContent = e.message || "No se pudo crear el PIN. Prueba otra vez.";
+    }finally{
+      btn.disabled = false; btn.textContent = "Crear PIN y entrar";
+    }
+  });
+
+  pintarBotonCuenta();
 
   showView("home");
 

@@ -482,6 +482,14 @@
   }
   .home-pausas .jugador-item{cursor:pointer;background:var(--crema);}
   .home-pausas .jugador-item:active{opacity:.75;}
+  /* Aviso "ya toca" en portada: misma familia visual que .home-pausas pero
+     con acento en rojo para distinguir "esto es urgente" de "esto es informativo". */
+  .home-proximo-toca{
+    background:#fff3ec;border:2px solid var(--rojo);border-radius:12px;
+    padding:10px 12px;max-width:420px;width:100%;text-align:left;
+  }
+  .home-proximo-toca .jugador-item{cursor:pointer;background:var(--crema);}
+  .home-proximo-toca .jugador-item:active{opacity:.75;}
   .ranking-fila-nombre{display:flex;align-items:center;gap:8px;text-align:left;}
   .ranking-pocos td{opacity:.55;}
 
@@ -1205,6 +1213,7 @@
         <div class="home-stats" id="home-stats"></div>
         <div class="home-campeon oculto" id="home-campeon"></div>
         <div class="home-pausas oculto" id="home-pausas"></div>
+        <div class="home-proximo-toca oculto" id="home-proximo-toca"></div>
         <div class="fila" style="justify-content:center;margin-top:6px;">
           <button class="btn verde-claro btn-primario-pulso" id="btn-jugar-rapido" style="font-size:1.3rem;padding:18px 28px;white-space:nowrap;">
             <svg class="icono-pala" viewBox="0 0 100 60" aria-hidden="true" focusable="false">
@@ -2210,6 +2219,7 @@
     }
 
     renderPausasHome();
+    renderAvisoProximoHome();
   }
 
   /* ===================== RANKING DEL CLUB (estilo ATP) ===================== */
@@ -2883,11 +2893,13 @@
   let ligaRapidaId = "";     // "" = partido suelto
   let equipoASel = [];
   let equipoBSel = [];
-  // "Jugar ahora" desde Próximos partidos: preselección de un solo uso (se
-  // consume en el próximo renderJugarRapido) + el id del próximo partido que
-  // hay que marcar "jugado" cuando este resultado se guarde de verdad.
+  // Preselección al entrar a "Jugar partido" desde el aviso de portada de un
+  // próximo partido cuya hora ya llegó: {a, b, origenProximoId}. La consume
+  // renderJugarRapido() una sola vez (se pone a null tras leerla).
   let preseleccionJugarRapido = null;
-  let origenProximoPartidoId = null;
+  // Id del "próximo partido" del que viene la partida en curso, para marcarlo
+  // "jugado" en cuanto se guarde el resultado (ver finalizarPartido).
+  let origenProximoIdActual = null;
 
   function maxPorEquipo(){ return modoRapido === "2vs2" ? 2 : 1; }
 
@@ -2949,19 +2961,18 @@
     saqueRapido = 3;
     ventajaRapido = true;
     ligaRapidaId = "";
-    equipoASel = [];
-    equipoBSel = [];
-    // Se consume una sola vez: si el usuario vuelve a entrar a esta pantalla
-    // sin pasar otra vez por "Jugar ahora", no debe arrastrar la selección
-    // ni el origen del partido programado anterior.
     if(preseleccionJugarRapido){
+      // Viene del aviso de portada: ya sabemos los dos jugadores, se deja
+      // todo listo para tocar "Empezar" directamente.
       equipoASel = [preseleccionJugarRapido.a];
       equipoBSel = [preseleccionJugarRapido.b];
-      origenProximoPartidoId = preseleccionJugarRapido.origenProximoId;
+      origenProximoIdActual = preseleccionJugarRapido.origenProximoId || null;
+      preseleccionJugarRapido = null;
     } else {
-      origenProximoPartidoId = null;
+      equipoASel = [];
+      equipoBSel = [];
+      origenProximoIdActual = null;
     }
-    preseleccionJugarRapido = null;
     document.querySelectorAll("#toggle-modo .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.modo===modoRapido));
     document.querySelectorAll("#toggle-puntos .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.puntos===String(puntosRapido)));
     document.querySelectorAll("#toggle-sets-rapido .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.sets===String(setsRapido)));
@@ -4505,13 +4516,13 @@
         };
         partidosSueltos.push(partido);
         savePartidosSueltos(partidosSueltos);
-        // Si este partido se empezó con "Jugar ahora" desde Próximos
-        // partidos, se marca solo como jugado — no hace falta el paso extra
-        // de ir a tocarlo a mano en la otra pantalla.
-        if(origenProximoPartidoId){
-          const prox = proximosPartidos.find(x=>x.id===origenProximoPartidoId);
-          if(prox && prox.estado === "pendiente"){ prox.estado = "jugado"; saveProximos(proximosPartidos); }
-          origenProximoPartidoId = null;
+        // Si esta partida venía del aviso "ya toca" (o de tocar un próximo
+        // partido), se marca automáticamente como jugado: si no, se seguiría
+        // avisando de un partido que ya se disputó.
+        if(origenProximoIdActual){
+          const prox = proximosPartidos.find(p=>p.id===origenProximoIdActual);
+          if(prox){ prox.estado = "jugado"; saveProximos(proximosPartidos); }
+          origenProximoIdActual = null;
         }
         eliminarProgresoPartido();
         scorerState = null;
@@ -5146,6 +5157,44 @@
     // Por defecto, evitar que A y B apunten al mismo jugador nada más abrir.
     if(players.length > 1) document.getElementById("select-proximo-b").value = players[1].id;
   }
+  /**
+   * Aviso en portada de partidos programados cuya hora ya llegó (o pasó) y
+   * siguen "pendiente" — para que quien esté junto al iPad sepa que toca
+   * jugar sin tener que entrar a mano en "Próximos partidos". Se repinta al
+   * entrar/volver a portada (vía renderHome) y también sola con el tiempo
+   * (ver el setInterval acotado a currentView==="home", más abajo).
+   */
+  function renderAvisoProximoHome(){
+    const cont = document.getElementById("home-proximo-toca");
+    if(!cont) return;
+    const ahora = Date.now();
+    const yaToca = proximosPartidos.filter(x=>x.estado==="pendiente" && x.fecha && x.fecha <= ahora)
+      .slice().sort((a,b)=>a.fecha-b.fecha);
+    if(!yaToca.length){ cont.classList.add("oculto"); cont.innerHTML = ""; return; }
+    cont.classList.remove("oculto");
+    cont.innerHTML = '<div class="stats-titulo" style="margin:0 0 6px;">⏰ Ya toca jugar</div>' +
+      yaToca.map(x=>{
+        return '<div class="jugador-item" data-proximo-toca="'+x.id+'">'+
+          '<div class="jugador-nombre">'+nombreConPos(x.jugadorA)+' 🆚 '+nombreConPos(x.jugadorB)+
+            '<span class="parciales" style="display:block;">programado '+escapeHtml(formatDateHora(x.fecha))+'</span></div>'+
+          '<span>▶</span>'+
+        '</div>';
+      }).join("");
+    cont.querySelectorAll("[data-proximo-toca]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const x = proximosPartidos.find(p=>p.id===el.getAttribute("data-proximo-toca"));
+        if(!x) return;
+        preseleccionJugarRapido = {a: x.jugadorA, b: x.jugadorB, origenProximoId: x.id};
+        showView("jugar-rapido", {titulo:"Jugar partido"});
+      });
+    });
+  }
+  // La portada no se repinta sola con el paso del tiempo (nada más la trae
+  // aquí un setInterval): sin esto, un partido programado a las 18:30 no
+  // aparecería hasta que alguien tocara "Inicio" a mano pasada esa hora.
+  // Acotado a portada para no hacer trabajo de fondo en el resto de la app.
+  setInterval(()=>{ if(currentView === "home") renderAvisoProximoHome(); }, 30000);
+
   function renderProximos(){
     const haySuficientes = players.length >= 2;
     // La primerísima carga de una tablet/navegador nuevo tarda unos segundos

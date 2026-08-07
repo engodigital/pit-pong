@@ -2883,6 +2883,11 @@
   let ligaRapidaId = "";     // "" = partido suelto
   let equipoASel = [];
   let equipoBSel = [];
+  // "Jugar ahora" desde Próximos partidos: preselección de un solo uso (se
+  // consume en el próximo renderJugarRapido) + el id del próximo partido que
+  // hay que marcar "jugado" cuando este resultado se guarde de verdad.
+  let preseleccionJugarRapido = null;
+  let origenProximoPartidoId = null;
 
   function maxPorEquipo(){ return modoRapido === "2vs2" ? 2 : 1; }
 
@@ -2946,6 +2951,17 @@
     ligaRapidaId = "";
     equipoASel = [];
     equipoBSel = [];
+    // Se consume una sola vez: si el usuario vuelve a entrar a esta pantalla
+    // sin pasar otra vez por "Jugar ahora", no debe arrastrar la selección
+    // ni el origen del partido programado anterior.
+    if(preseleccionJugarRapido){
+      equipoASel = [preseleccionJugarRapido.a];
+      equipoBSel = [preseleccionJugarRapido.b];
+      origenProximoPartidoId = preseleccionJugarRapido.origenProximoId;
+    } else {
+      origenProximoPartidoId = null;
+    }
+    preseleccionJugarRapido = null;
     document.querySelectorAll("#toggle-modo .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.modo===modoRapido));
     document.querySelectorAll("#toggle-puntos .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.puntos===String(puntosRapido)));
     document.querySelectorAll("#toggle-sets-rapido .toggle-opcion").forEach(b=>b.classList.toggle("activo", b.dataset.sets===String(setsRapido)));
@@ -4489,6 +4505,14 @@
         };
         partidosSueltos.push(partido);
         savePartidosSueltos(partidosSueltos);
+        // Si este partido se empezó con "Jugar ahora" desde Próximos
+        // partidos, se marca solo como jugado — no hace falta el paso extra
+        // de ir a tocarlo a mano en la otra pantalla.
+        if(origenProximoPartidoId){
+          const prox = proximosPartidos.find(x=>x.id===origenProximoPartidoId);
+          if(prox && prox.estado === "pendiente"){ prox.estado = "jugado"; saveProximos(proximosPartidos); }
+          origenProximoPartidoId = null;
+        }
         eliminarProgresoPartido();
         scorerState = null;
         currentHistorialId = partido.id;
@@ -5158,9 +5182,18 @@
             ' · cuota '+cuotaDecimal(prob)+' / '+cuotaDecimal(1-prob)+
           '</span>'+
         '</div>'+
+        '<button class="btn dorado small" data-proximo-jugar="'+x.id+'">▶ Jugar ahora</button>'+
         '<button class="btn verde-claro small" data-proximo-jugado="'+x.id+'">✅ Jugado</button>'+
         '<button class="btn rojo small" data-proximo-cancelar="'+x.id+'">🗑️</button>';
       cont.appendChild(div);
+    });
+    cont.querySelectorAll("[data-proximo-jugar]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const x = proximosPartidos.find(p=>p.id===btn.getAttribute("data-proximo-jugar"));
+        if(!x) return;
+        preseleccionJugarRapido = {a: x.jugadorA, b: x.jugadorB, origenProximoId: x.id};
+        showView("jugar-rapido", {titulo:"Jugar partido"});
+      });
     });
     cont.querySelectorAll("[data-proximo-jugado]").forEach(btn=>{
       btn.addEventListener("click", ()=>{

@@ -413,6 +413,12 @@
     box-shadow:var(--shadow);max-width:100%;
   }
   .home-campeon .avatar{border:2px solid var(--madera-oscura);}
+  .home-pausas{
+    background:#fff8ec;border:2px dashed var(--madera);border-radius:12px;
+    padding:10px 12px;max-width:420px;width:100%;text-align:left;
+  }
+  .home-pausas .jugador-item{cursor:pointer;background:var(--crema);}
+  .home-pausas .jugador-item:active{opacity:.75;}
   .ranking-fila-nombre{display:flex;align-items:center;gap:8px;text-align:left;}
   .ranking-pocos td{opacity:.55;}
 
@@ -889,6 +895,7 @@
         <div class="home-subtitle">Plataforma de Torneos</div>
         <div class="home-stats" id="home-stats"></div>
         <div class="home-campeon oculto" id="home-campeon"></div>
+        <div class="home-pausas oculto" id="home-pausas"></div>
         <div class="fila" style="justify-content:center;margin-top:6px;">
           <button class="btn dorado" id="btn-jugar-rapido" style="font-size:1rem;padding:12px 24px;">🏓 Jugar partido</button>
           <button class="btn verde-claro" id="btn-ligas" style="font-size:1rem;padding:12px 24px;">🏅 Ligas</button>
@@ -1232,6 +1239,7 @@
       <button class="btn ghost" id="btn-deshacer">↩️ Deshacer último punto</button>
       <button class="btn madera" id="btn-cambiar-campo">🔄 Cambiar de campo</button>
       <button class="btn azul" id="btn-net">🌐 Red (repetir punto)</button>
+      <button class="btn verde-claro" id="btn-pausar-partido">⏸️ Pausar y guardar</button>
       <button class="btn rojo" id="btn-cancelar-partido">Cancelar partido</button>
     </div>
     <div id="scorer-ganador" class="oculto" style="margin-top:20px;"></div>
@@ -1332,11 +1340,22 @@
   function loadTournaments(){ try{ return JSON.parse(localStorage.getItem(LS_TOURNAMENTS)) || []; }catch(e){ return []; } }
   function saveTournaments(arr){ localStorage.setItem(LS_TOURNAMENTS, JSON.stringify(arr)); _rankCache = null; programarSync(); }
   function loadPartidosSueltos(){ try{ return JSON.parse(localStorage.getItem(LS_PARTIDOS_SUELTOS)) || []; }catch(e){ return []; } }
+
+  // Partidos en pausa: SOLO en este dispositivo, a propósito. No se manda al
+  // servidor (guardarTodo_ en Apps Script ni lee ni escribe esta clave, así
+  // que meterla en el payload no serviría de nada más que confundir). Es la
+  // respuesta directa a "recargar la tablet a mitad de partido borra el
+  // marcador": ahora sobrevive a un refresco/cierre en la MISMA tablet.
+  // Sincronizarlo entre dispositivos es una mejora futura, no esta.
+  const LS_PARTIDOS_PAUSA = "pitpong_partidos_pausa";
+  function loadPartidosEnPausa(){ try{ return JSON.parse(localStorage.getItem(LS_PARTIDOS_PAUSA)) || []; }catch(e){ return []; } }
+  function savePartidosEnPausaLS(){ localStorage.setItem(LS_PARTIDOS_PAUSA, JSON.stringify(partidosEnPausa)); }
   function savePartidosSueltos(arr){ localStorage.setItem(LS_PARTIDOS_SUELTOS, JSON.stringify(arr)); _rankCache = null; programarSync(); }
 
   let players = loadPlayers();
   let tournaments = loadTournaments();
   let partidosSueltos = loadPartidosSueltos();
+  let partidosEnPausa = loadPartidosEnPausa();
 
   // Posiciones del ranking del club, cacheadas: se invalidan en cada save*
   // (cualquier cambio de datos pasa por ahí) y se recalculan al primer uso.
@@ -1768,6 +1787,8 @@
     } else {
       chip.classList.add("oculto");
     }
+
+    renderPausasHome();
   }
 
   /* ===================== RANKING DEL CLUB (estilo ATP) ===================== */
@@ -2897,7 +2918,90 @@
     prepararUIScorer();
   }
 
-  function prepararUIScorer(){
+  /* ===================== PAUSAR / REANUDAR PARTIDO ===================== */
+  // Id estable del partido en curso: para uno de torneo/liga, el propio id
+  // del partido (así reanudarlo dos veces no crea dos entradas); para una
+  // partida suelta, que no existe como registro hasta que termina, se le
+  // asigna un id la primera vez que se guarda el progreso.
+  function idPausaActual(){
+    if(!scorerState) return null;
+    if(scorerState.tipo === "torneo"){
+      const ctx = currentScorerCtx || {};
+      return "t_" + scorerState.tournamentId + "_" + (ctx.matchId || ("r"+ctx.roundIndex+"p"+ctx.matchIndex));
+    }
+    if(!scorerState._pausaId) scorerState._pausaId = uid("pausa");
+    return scorerState._pausaId;
+  }
+  function guardarProgresoPartido(){
+    if(!scorerState) return;
+    const id = idPausaActual();
+    const entrada = {
+      id: id,
+      fecha: Date.now(),
+      ctx: currentScorerCtx ? JSON.parse(JSON.stringify(currentScorerCtx)) : null,
+      scorerState: JSON.parse(JSON.stringify(scorerState))
+    };
+    const idx = partidosEnPausa.findIndex(p=>p.id===id);
+    if(idx>=0) partidosEnPausa[idx] = entrada; else partidosEnPausa.push(entrada);
+    savePartidosEnPausaLS();
+  }
+  function eliminarProgresoPartido(){
+    const id = idPausaActual();
+    if(!id) return;
+    partidosEnPausa = partidosEnPausa.filter(p=>p.id!==id);
+    savePartidosEnPausaLS();
+  }
+  function tiempoRelativo(ts){
+    const min = Math.max(0, Math.round((Date.now()-ts)/60000));
+    if(min < 1) return "ahora mismo";
+    if(min < 60) return "hace " + min + " min";
+    const horas = Math.round(min/60);
+    if(horas < 24) return "hace " + horas + " h";
+    return formatDate(ts);
+  }
+  function renderPausasHome(){
+    const cont = document.getElementById("home-pausas");
+    if(!partidosEnPausa.length){ cont.classList.add("oculto"); cont.innerHTML = ""; return; }
+    cont.classList.remove("oculto");
+    const ordenadas = partidosEnPausa.slice().sort((a,b)=>b.fecha-a.fecha);
+    cont.innerHTML = '<div class="stats-titulo" style="margin:0 0 6px;">⏸️ Partidos en pausa en esta tablet</div>' +
+      ordenadas.map(p=>{
+        const s = p.scorerState;
+        const jg = s.games.filter(g=>g.a>g.b).length;
+        const jp = s.games.filter(g=>g.a<g.b).length;
+        return '<div class="jugador-item" data-reanudar="'+p.id+'">'+
+          '<div class="jugador-nombre">'+escapeHtml(s.a.label)+' vs '+escapeHtml(s.b.label)+
+            ' <span class="parciales">· juegos '+jg+'-'+jp+' · '+tiempoRelativo(p.fecha)+'</span></div>'+
+          '<span>▶</span>'+
+        '</div>';
+      }).join("");
+    cont.querySelectorAll("[data-reanudar]").forEach(el=>{
+      el.addEventListener("click", ()=>reanudarPartidoPausado(el.getAttribute("data-reanudar")));
+    });
+  }
+  function reanudarPartidoPausado(id){
+    const p = partidosEnPausa.find(x=>x.id===id);
+    if(!p) return;
+    scorerState = JSON.parse(JSON.stringify(p.scorerState));
+    currentScorerCtx = p.ctx ? JSON.parse(JSON.stringify(p.ctx)) : null;
+    if(scorerState.tipo === "torneo"){
+      const t = getTournament(scorerState.tournamentId);
+      if(esLiga(t)) currentLigaId = t.id; else currentBracketId = t.id;
+    }
+    prepararUIScorer(false); // false = no repetir el sorteo, el partido ya iba en marcha
+    showView("scorer", {titulo:"Marcador"});
+  }
+  document.getElementById("btn-pausar-partido").addEventListener("click", ()=>{
+    if(!scorerState) return;
+    guardarProgresoPartido();
+    scorerState = null;
+    currentScorerCtx = null;
+    cerrarSorteoMoneda();
+    ocultarAvisoNet();
+    showView("home");
+  });
+
+  function prepararUIScorer(mostrarMoneda){
     document.getElementById("scorer-ganador").classList.add("oculto");
     document.getElementById("panel-a").classList.remove("oculto");
     document.getElementById("panel-b").classList.remove("oculto");
@@ -2920,7 +3024,7 @@
     document.getElementById("check-anuncio-saque").classList.toggle(
       "oculto", !("speechSynthesis" in window));
     renderScorer();
-    mostrarSorteoMoneda();
+    if(mostrarMoneda !== false) mostrarSorteoMoneda();
   }
 
   /* ===================== AVISO DE RED (let) ===================== */
@@ -3384,6 +3488,9 @@
       chip.textContent = "J"+(i+1)+": "+g[izq]+"-"+g[der];
       log.appendChild(chip);
     });
+    // Cada render (cada punto, cada cambio) deja el partido guardado por si
+    // se recarga la tablet: no hace falta acordarse de pulsar "Pausar".
+    guardarProgresoPartido();
   }
 
   function marcarPunto(quien){
@@ -3590,6 +3697,7 @@
       // rompería (currentBracketId puede estar vacío o ser de otro torneo).
       const eraTorneo = scorerState.tipo === "torneo";
       const t = eraTorneo ? getTournament(scorerState.tournamentId) : null;
+      eliminarProgresoPartido();
       scorerState = null;
       cerrarSorteoMoneda();
       if(t && esLiga(t)){
@@ -3636,6 +3744,7 @@
         else if(esLiguilla(t)) comprobarFinLiguilla(t);
         else advanceWinner(t, ctx.roundIndex, ctx.matchIndex);
         saveTournaments(tournaments);
+        eliminarProgresoPartido();
         scorerState = null;
         if(t.status==="finalizado"){
           currentHistorialId = t.id;
@@ -3662,6 +3771,7 @@
         };
         partidosSueltos.push(partido);
         savePartidosSueltos(partidosSueltos);
+        eliminarProgresoPartido();
         scorerState = null;
         currentHistorialId = partido.id;
         historialReciénFinalizado = true;

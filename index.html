@@ -290,7 +290,7 @@
   @media (prefers-reduced-motion: reduce){ .btn-primario-pulso{animation:none;} }
   .btn.small{padding:7px 12px;min-height:36px;font-size:.85rem;}
 
-  input[type=text],input[type=number],textarea{
+  input[type=text],input[type=number],input[type=datetime-local],select.select-club,textarea{
     width:100%;
     padding:11px 12px;
     border-radius:8px;
@@ -1070,6 +1070,7 @@
         <div class="fila" style="justify-content:center;margin-top:10px;">
           <button class="btn dorado" id="btn-ligas" style="font-size:1rem;padding:12px 24px;">🏅 Ligas</button>
           <button class="btn madera" id="btn-ranking" style="font-size:1rem;padding:12px 24px;">📊 Ranking</button>
+          <button class="btn azul" id="btn-proximos" style="font-size:1rem;padding:12px 24px;">📅 Próximos partidos</button>
         </div>
       </div>
       <div class="corner-grid">
@@ -1169,6 +1170,38 @@
       </div>
     </div>
     <button class="btn dorado" id="btn-generar-torneo" style="width:100%;font-size:1.05rem;">🏆 Generar cuadro y crear torneo</button>
+  </main>
+</section>
+
+<!-- ===================== PRÓXIMOS PARTIDOS ===================== -->
+<section id="view-proximos" class="view oculto">
+  <main>
+    <div class="card">
+      <h3>📅 Programar un próximo partido</h3>
+      <div id="proximo-sin-jugadores" class="vacio oculto">Hacen falta al menos 2 jugadores registrados — añádelos primero en "Jugadores y estadísticas".</div>
+      <div id="proximo-form">
+        <div class="fila">
+          <div style="flex:1;min-width:160px;">
+            <label>Jugador A</label>
+            <select class="select-club" id="select-proximo-a"></select>
+          </div>
+          <div style="flex:1;min-width:160px;">
+            <label>Jugador B</label>
+            <select class="select-club" id="select-proximo-b"></select>
+          </div>
+        </div>
+        <label>Fecha y hora</label>
+        <input type="datetime-local" id="input-proximo-fecha">
+        <div class="home-stats oculto" id="proximo-error" style="margin-top:8px;color:var(--rojo);font-weight:700;"></div>
+        <button class="btn dorado" id="btn-programar-proximo" style="width:100%;margin-top:12px;font-size:1.05rem;">📅 Programar partido</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Partidos programados</h3>
+      <p class="nota" style="margin:0 0 10px;">Solo informativo por ahora — la cuota se calcula igual que en el sorteo de moneda (estadísticas reales), todavía no se puede apostar.</p>
+      <div id="lista-proximos"></div>
+      <div class="vacio oculto" id="proximos-vacio">Todavía no hay ningún partido programado.</div>
+    </div>
   </main>
 </section>
 
@@ -1523,6 +1556,7 @@
   const LS_PLAYERS = "pitpong_jugadores";
   const LS_TOURNAMENTS = "pitpong_torneos";
   const LS_PARTIDOS_SUELTOS = "pitpong_partidos_sueltos";
+  const LS_PROXIMOS = "pitpong_proximos_partidos";
 
   function loadPlayers(){ try{ return JSON.parse(localStorage.getItem(LS_PLAYERS)) || []; }catch(e){ return []; } }
   function savePlayers(arr){ localStorage.setItem(LS_PLAYERS, JSON.stringify(arr)); _rankCache = null; programarSync(); }
@@ -1540,11 +1574,14 @@
   function loadPartidosEnPausa(){ try{ return JSON.parse(localStorage.getItem(LS_PARTIDOS_PAUSA)) || []; }catch(e){ return []; } }
   function savePartidosEnPausaLS(){ localStorage.setItem(LS_PARTIDOS_PAUSA, JSON.stringify(partidosEnPausa)); }
   function savePartidosSueltos(arr){ localStorage.setItem(LS_PARTIDOS_SUELTOS, JSON.stringify(arr)); _rankCache = null; programarSync(); }
+  function loadProximos(){ try{ return JSON.parse(localStorage.getItem(LS_PROXIMOS)) || []; }catch(e){ return []; } }
+  function saveProximos(arr){ localStorage.setItem(LS_PROXIMOS, JSON.stringify(arr)); programarSync(); }
 
   let players = loadPlayers();
   let tournaments = loadTournaments();
   let partidosSueltos = loadPartidosSueltos();
   let partidosEnPausa = loadPartidosEnPausa();
+  let proximosPartidos = loadProximos();
 
   // Posiciones del ranking del club, cacheadas: se invalidan en cada save*
   // (cualquier cambio de datos pasa por ahí) y se recalculan al primer uso.
@@ -1569,8 +1606,14 @@
 
   const LS_ELIMINADOS = "pitpong_eliminados";
   function loadEliminados(){
-    try{ return JSON.parse(localStorage.getItem(LS_ELIMINADOS)) || {jugadores:[],torneos:[],partidosSueltos:[]}; }
-    catch(e){ return {jugadores:[],torneos:[],partidosSueltos:[]}; }
+    // Dispositivos con datos de antes de "proximosPartidos" tienen el objeto
+    // guardado sin esa clave: hay que rellenarla, no solo confiar en el
+    // valor por defecto (que solo se usa si no hay nada guardado todavía).
+    let e;
+    try{ e = JSON.parse(localStorage.getItem(LS_ELIMINADOS)) || {}; }
+    catch(err){ e = {}; }
+    ["jugadores","torneos","partidosSueltos","proximosPartidos"].forEach(k=>{ if(!e[k]) e[k] = []; });
+    return e;
   }
   function saveEliminados(){ localStorage.setItem(LS_ELIMINADOS, JSON.stringify(eliminados)); }
   let eliminados = loadEliminados();
@@ -1701,14 +1744,17 @@
     const idsRemotos = new Set(remotos.map(p=>p.id));
     const idsTorneosRemotos = new Set((datos.torneos||[]).map(t=>t.id));
     const idsSueltosRemotos = new Set((datos.partidosSueltos||[]).map(p=>p.id));
+    const idsProximosRemotos = new Set((datos.proximosPartidos||[]).map(x=>x.id));
     const soloAqui =
       players.filter(p=>!idsRemotos.has(p.id) && !eliminados.jugadores.includes(p.id)).length +
       tournaments.filter(t=>!idsTorneosRemotos.has(t.id) && !eliminados.torneos.includes(t.id)).length +
-      partidosSueltos.filter(p=>!idsSueltosRemotos.has(p.id) && !eliminados.partidosSueltos.includes(p.id)).length;
+      partidosSueltos.filter(p=>!idsSueltosRemotos.has(p.id) && !eliminados.partidosSueltos.includes(p.id)).length +
+      proximosPartidos.filter(x=>!idsProximosRemotos.has(x.id) && !eliminados.proximosPartidos.includes(x.id)).length;
 
     players         = unirConLocal(players,         remotos,                    eliminados.jugadores);
     tournaments     = unirConLocal(tournaments,     datos.torneos || [],        eliminados.torneos);
     partidosSueltos = unirConLocal(partidosSueltos, datos.partidosSueltos || [], eliminados.partidosSueltos);
+    proximosPartidos = unirConLocal(proximosPartidos, datos.proximosPartidos || [], eliminados.proximosPartidos);
     // OJO: eliminados NO se vacía aquí. Antes se vaciaba y había una carrera:
     // si esta respuesta llegaba antes de subir un borrado, la lápida se
     // perdía y el servidor devolvía el registro "resucitado". Ahora las
@@ -1722,6 +1768,7 @@
     savePlayers(players);
     saveTournaments(tournaments);
     savePartidosSueltos(partidosSueltos);
+    saveProximos(proximosPartidos);
     saveEliminados();
     aplicandoDelServidor = false;
 
@@ -1758,11 +1805,12 @@
           })),
           torneos: tournaments,
           partidosSueltos: partidosSueltos,
+          proximosPartidos: proximosPartidos,
           eliminados: elimEnviados
         }
       });
       // El servidor ya procesó estas lápidas: se pueden retirar.
-      ["jugadores","torneos","partidosSueltos"].forEach(k=>{
+      ["jugadores","torneos","partidosSueltos","proximosPartidos"].forEach(k=>{
         eliminados[k] = eliminados[k].filter(id=>!elimEnviados[k].includes(id));
       });
       saveEliminados();
@@ -1798,6 +1846,7 @@
     else if(currentView === "ranking") renderRanking();
     else if(currentView === "continuar") renderContinuar();
     else if(currentView === "historial") renderHistorial();
+    else if(currentView === "proximos") renderProximos();
     else if(currentView === "bracket" && currentBracketId && getTournament(currentBracketId)) renderBracket(currentBracketId);
   }
 
@@ -1873,6 +1922,7 @@
     if(name==="crear-liga") return "Nueva liga";
     if(name==="liga"){ const l=getLiga(currentLigaId); return l ? l.name : "Liga"; }
     if(name==="liga-partido") return "Nuevo partido";
+    if(name==="proximos") return "Próximos partidos";
     return null;
   }
 
@@ -1930,6 +1980,7 @@
       if(currentLigaId && getLiga(currentLigaId)) renderLigaPartido();
       else { showView("ligas"); return; }
     }
+    if(name === "proximos") renderProximos();
   }
 
   document.getElementById("btn-volver").addEventListener("click", ()=>{
@@ -4618,6 +4669,98 @@
     }
     localStorage.setItem(FLAG, "1");
   })();
+
+  /* ===================== PRÓXIMOS PARTIDOS =====================
+     Calendario de partidos 1vs1 programados a futuro entre jugadores ya
+     registrados. Solo informativo por ahora (cuota calculada igual que en
+     el sorteo de moneda, con probabilidadVictoria) — apostar de verdad
+     necesita el ledger de PitCoin gastable, que sigue pendiente de diseño
+     aparte. Cualquiera con la tablet puede programar/cancelar, igual que
+     crear un torneo o partido suelto: el login con PIN sigue siendo
+     opcional, no una puerta de acceso. */
+  function formatDateHora(ts){
+    const d = new Date(ts);
+    return d.toLocaleDateString("es-ES",{day:"2-digit",month:"short"}) + " · " +
+           d.toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"});
+  }
+  function pintarSelectsProximos(){
+    ["select-proximo-a","select-proximo-b"].forEach(id=>{
+      document.getElementById(id).innerHTML =
+        players.map(p=>'<option value="'+p.id+'">'+escapeHtml(p.name)+'</option>').join("");
+    });
+    // Por defecto, evitar que A y B apunten al mismo jugador nada más abrir.
+    if(players.length > 1) document.getElementById("select-proximo-b").value = players[1].id;
+  }
+  function renderProximos(){
+    const haySuficientes = players.length >= 2;
+    document.getElementById("proximo-sin-jugadores").classList.toggle("oculto", haySuficientes);
+    document.getElementById("proximo-form").classList.toggle("oculto", !haySuficientes);
+    if(haySuficientes) pintarSelectsProximos();
+    document.getElementById("proximo-error").classList.add("oculto");
+
+    const cont = document.getElementById("lista-proximos");
+    const vacio = document.getElementById("proximos-vacio");
+    const pendientes = proximosPartidos.filter(x=>x.estado==="pendiente")
+      .slice().sort((a,b)=>(a.fecha||0)-(b.fecha||0));
+    cont.innerHTML = "";
+    vacio.classList.toggle("oculto", pendientes.length > 0);
+    pendientes.forEach(x=>{
+      const prob = probabilidadVictoria([x.jugadorA],[x.jugadorB]);
+      const div = document.createElement("div");
+      div.className = "jugador-item";
+      div.innerHTML =
+        '<div class="jugador-nombre">'+nombreConPos(x.jugadorA)+' 🆚 '+nombreConPos(x.jugadorB)+
+          '<span class="parciales" style="display:block;">'+
+            (x.fecha ? escapeHtml(formatDateHora(x.fecha)) : "Sin fecha")+
+            ' · cuota '+cuotaDecimal(prob)+' / '+cuotaDecimal(1-prob)+
+          '</span>'+
+        '</div>'+
+        '<button class="btn verde-claro small" data-proximo-jugado="'+x.id+'">✅ Jugado</button>'+
+        '<button class="btn rojo small" data-proximo-cancelar="'+x.id+'">🗑️</button>';
+      cont.appendChild(div);
+    });
+    cont.querySelectorAll("[data-proximo-jugado]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const x = proximosPartidos.find(p=>p.id===btn.getAttribute("data-proximo-jugado"));
+        if(x){ x.estado = "jugado"; saveProximos(proximosPartidos); renderProximos(); }
+      });
+    });
+    cont.querySelectorAll("[data-proximo-cancelar]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-proximo-cancelar");
+        if(!confirm("¿Cancelar este partido programado?")) return;
+        proximosPartidos = proximosPartidos.filter(p=>p.id!==id);
+        marcarEliminado("proximosPartidos", id);
+        saveProximos(proximosPartidos);
+        renderProximos();
+      });
+    });
+  }
+  document.getElementById("btn-programar-proximo").addEventListener("click", ()=>{
+    const errEl = document.getElementById("proximo-error");
+    errEl.classList.add("oculto");
+    const a = document.getElementById("select-proximo-a").value;
+    const b = document.getElementById("select-proximo-b").value;
+    const fechaVal = document.getElementById("input-proximo-fecha").value;
+    if(!a || !b || a === b){
+      errEl.textContent = "Elige dos jugadores distintos.";
+      errEl.classList.remove("oculto");
+      return;
+    }
+    if(!fechaVal){
+      errEl.textContent = "Elige una fecha y hora.";
+      errEl.classList.remove("oculto");
+      return;
+    }
+    proximosPartidos.push({
+      id: uid("prox"), jugadorA: a, jugadorB: b, fecha: new Date(fechaVal).getTime(),
+      estado: "pendiente", creadoEn: Date.now()
+    });
+    saveProximos(proximosPartidos);
+    document.getElementById("input-proximo-fecha").value = "";
+    renderProximos();
+  });
+  document.getElementById("btn-proximos").addEventListener("click", ()=>showView("proximos", {titulo:"Próximos partidos"}));
 
   /* ===================== CUENTA CON PIN =====================
      Sistema propio de Pit Pong (Sheet propio, salt propio) inspirado en el

@@ -378,7 +378,18 @@ function cargarTodo_() {
     };
   });
 
-  return { jugadores: jugadores, torneos: torneos, partidosSueltos: sueltos };
+  var proximos = leerTabla_('ProximosPartidos').map(function (f) {
+    return {
+      id: String(f.id),
+      jugadorA: String(f.jugadorAId),
+      jugadorB: String(f.jugadorBId),
+      fecha: f.fecha ? new Date(f.fecha).getTime() : null,
+      estado: String(f.estado || 'pendiente'),
+      creadoEn: f.creadoEn ? new Date(f.creadoEn).getTime() : Date.now()
+    };
+  });
+
+  return { jugadores: jugadores, torneos: torneos, partidosSueltos: sueltos, proximosPartidos: proximos };
 }
 
 /* ------------------------------ GUARDAR ------------------------------ */
@@ -417,6 +428,7 @@ function guardarTodo_(datos) {
       });
     var torneos = mergePorId_(actual.torneos, datos.torneos, elim.torneos);
     var sueltos = mergePorId_(actual.partidosSueltos, datos.partidosSueltos, elim.partidosSueltos);
+    var proximos = mergePorId_(actual.proximosPartidos, datos.proximosPartidos, elim.proximosPartidos);
 
     var mapa = {};
     jugadores.forEach(function (j) { mapa[j.id] = j.name; });
@@ -494,9 +506,22 @@ function guardarTodo_(datos) {
       };
     }));
 
+    escribirTabla_('ProximosPartidos', proximos.map(function (x) {
+      return {
+        id: x.id,
+        jugadorAId: x.jugadorA,
+        jugadorBId: x.jugadorB,
+        jugadorA: mapa[x.jugadorA] || x.jugadorA,
+        jugadorB: mapa[x.jugadorB] || x.jugadorB,
+        fecha: fecha_(x.fecha),
+        estado: x.estado || 'pendiente',
+        creadoEn: fecha_(x.creadoEn || Date.now())
+      };
+    }));
+
     // Devolvemos el estado ya fusionado (las fotos siguen viviendo en su
     // hoja, así que se conservan tal cual venían de cargarTodo_).
-    return { jugadores: jugadores, torneos: torneos, partidosSueltos: sueltos };
+    return { jugadores: jugadores, torneos: torneos, partidosSueltos: sueltos, proximosPartidos: proximos };
   } finally {
     lock.releaseLock();
   }

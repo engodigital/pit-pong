@@ -173,6 +173,10 @@
     width:100%;
     max-width:100%;
   }
+  /* Envoltorio SIN overflow:hidden: el sello decorativo se asoma en la
+     esquina del círculo, y .logo-badge necesita recortar la foto en redondo
+     (su propio overflow:hidden recortaría también el sello si viviera dentro). */
+  .logo-wrap{position:relative;}
   .logo-badge{
     width:150px;height:150px;
     border-radius:50%;
@@ -236,7 +240,7 @@
     width:100%;
     text-align:center;
     overflow-wrap:break-word;
-    transition:transform .12s ease;
+    transition:transform .12s ease, box-shadow .15s ease;
   }
   .corner-btn:active{transform:scale(.96);}
   .corner-btn .emoji{font-size:clamp(2rem, 5vh, 3.2rem);}
@@ -281,6 +285,10 @@
     padding:16px;
     margin-bottom:14px;
     box-shadow:var(--shadow);
+    /* position+z-index: crea su propio stacking context, para que el
+       z-index:-1 del ::after (marca de agua) quede detrás del FONDO de esta
+       tarjeta y no se escape a comparar contra el resto de la página. */
+    position:relative;z-index:0;
   }
   .card h3{color:var(--madera-oscura);}
   .btn{
@@ -294,8 +302,9 @@
     color:var(--blanco);
     background:var(--verde);
     box-shadow:0 2px 6px rgba(26,17,8,.25);
+    transition:transform .1s ease, opacity .1s ease;
   }
-  .btn:active{opacity:.85;}
+  .btn:active{opacity:.85;transform:scale(.97);}
   .btn.rojo{background:var(--rojo);}
   .btn.madera{background:var(--madera);}
   .btn.azul{background:var(--azul);}
@@ -656,6 +665,9 @@
   .ganador-box{
     text-align:center;padding:24px;background:var(--dorado);border-radius:var(--radius);
     color:var(--tinta);box-shadow:var(--shadow);
+    /* position+z-index: stacking context propio, para que el z-index:-1 del
+       sunburst quede detrás del fondo de ESTA caja (ver mismo motivo en .card). */
+    position:relative;z-index:0;overflow:hidden;
   }
   .ganador-box h2{font-size:1.8rem;}
 
@@ -910,6 +922,101 @@
     .scorer-acciones .btn{min-height:38px;padding:8px 14px;font-size:.8rem;}
     .card{padding:10px;margin-bottom:8px;}
   }
+
+  /* =====================================================================
+     ESTILO "CARTEL OFICIAL" — cel-shading, contorno grueso, líneas de
+     velocidad. Evolución visual sobre el cartel del torneo (cómic urbano,
+     colores planos, motivo de hoja ya presente en el escudo real del club).
+     Todo decorativo: pointer-events:none donde puede solaparse con algo
+     tocable, y respeta prefers-reduced-motion.
+     ===================================================================== */
+
+  /* Marca de agua de hoja en las tarjetas: sutil, no interfiere con nada. */
+  .card::after{
+    content:"";
+    position:absolute;
+    right:8px;bottom:6px;
+    width:52px;height:52px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M 50 92 C 37 78.7 21.5 82.7 21.5 82.7 C 21.8 81.7 21.1 83.7 50 92 C 44.9 68.9 27.6 58.8 27.6 58.8 C 28.5 58.3 26.8 59.4 50 92 C 59.4 67.3 50 47 50 47 C 51.2 47 48.9 47 50 92 C 69.5 78.6 72.4 58.8 72.4 58.8 C 73.2 59.4 71.5 58.3 50 92 C 68.4 95.1 78.5 82.7 78.5 82.7 C 78.9 83.7 78.2 81.7 50 92 Z' fill='%231D5523' stroke='%231A1108' stroke-width='4'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-size:contain;
+    opacity:.16;
+    pointer-events:none;
+    z-index:-1;
+  }
+
+  /* Sello circular decorativo en la esquina del logo de la portada, como el
+     badge/sello del cartel oficial. Icono puro (sin texto: nunca desborda). */
+  .sello-oficial{
+    position:absolute;right:-8px;bottom:-4px;
+    width:40px;height:40px;
+    pointer-events:none;
+    animation:sello-gira 16s linear infinite;
+    filter:drop-shadow(0 2px 3px rgba(26,17,8,.35));
+  }
+  @keyframes sello-gira{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+  @media (min-width:840px){ .sello-oficial{width:30px;height:30px;right:-4px;bottom:-2px;} }
+  @media (orientation:landscape) and (max-height:520px){ .sello-oficial{display:none;} }
+
+  /* Icono de pala+pelota (sustituye al emoji plano en el botón principal). */
+  .icono-pala{
+    width:1.5em;height:1.5em;
+    vertical-align:-.32em;margin-right:.12em;
+    flex-shrink:0;
+  }
+
+  /* Impacto al marcar un punto: golpe de escala en el panel + ráfaga de
+     líneas de velocidad detrás del número. Se dispara añadiendo la clase
+     .impacto-punto (ver marcarPunto en el script); nunca cambia el marcador. */
+  .impacto-svg{
+    position:absolute;inset:0;margin:auto;
+    width:72%;height:72%;
+    opacity:0;
+    pointer-events:none;
+  }
+  .score-panel.impacto-punto{animation:golpe-punto .38s ease-out;}
+  .score-panel.impacto-punto .impacto-svg{animation:rayos-punto .45s ease-out;}
+  @keyframes golpe-punto{
+    0%{transform:scale(1);}
+    30%{transform:scale(1.045);}
+    100%{transform:scale(1);}
+  }
+  @keyframes rayos-punto{
+    0%{opacity:0;transform:scale(.6);}
+    35%{opacity:.9;transform:scale(1.05);}
+    100%{opacity:0;transform:scale(1.3);}
+  }
+
+  /* Victoria: sunburst detrás del trofeo + entrada con rebote suave. */
+  .victoria-rayos{
+    position:absolute;inset:8%;
+    width:84%;height:84%;
+    z-index:-1;
+    pointer-events:none;
+    animation:rayos-gira 18s linear infinite;
+  }
+  @keyframes rayos-gira{ from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+  .ganador-box{animation:ganador-entrada .5s cubic-bezier(.22,.9,.32,1.2);}
+  @keyframes ganador-entrada{
+    0%{transform:scale(.85);opacity:0;}
+    60%{transform:scale(1.03);opacity:1;}
+    100%{transform:scale(1);opacity:1;}
+  }
+
+  /* Interacciones un poco más vivas en botones clave, solo con puntero fino
+     (ratón): en táctil (tablet junto a la mesa) no hay estado hover real. */
+  @media (hover:hover) and (pointer:fine){
+    .btn:hover{filter:brightness(1.08);}
+    .corner-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow), 0 8px 18px rgba(26,17,8,.28);}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .sello-oficial,
+    .victoria-rayos,
+    .ganador-box,
+    .score-panel.impacto-punto,
+    .score-panel.impacto-punto .impacto-svg{animation:none;}
+  }
 </style>
 </head>
 <body>
@@ -1080,14 +1187,38 @@
     </div>
     <div class="home-wrap">
       <div class="home-header">
-        <div class="logo-badge"><img id="logo-img" src="" alt="Logo Pit Pong"></div>
+        <div class="logo-wrap">
+          <div class="logo-badge"><img id="logo-img" src="" alt="Logo Pit Pong"></div>
+          <!-- Sello decorativo estilo cartel oficial: solo icono, sin texto.
+               Vive FUERA de .logo-badge a propósito: ese círculo recorta la
+               foto con overflow:hidden, que también recortaría el sello. -->
+          <svg class="sello-oficial" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+            <circle cx="50" cy="50" r="45" fill="var(--dorado)" stroke="var(--tinta)" stroke-width="5"/>
+            <circle cx="50" cy="50" r="35" fill="none" stroke="var(--tinta)" stroke-width="2.5" stroke-dasharray="4 5"/>
+            <g transform="translate(50,58) scale(.34) translate(-50,-92)">
+              <path d="M 50 92 C 37 78.7 21.5 82.7 21.5 82.7 C 21.8 81.7 21.1 83.7 50 92 C 44.9 68.9 27.6 58.8 27.6 58.8 C 28.5 58.3 26.8 59.4 50 92 C 59.4 67.3 50 47 50 47 C 51.2 47 48.9 47 50 92 C 69.5 78.6 72.4 58.8 72.4 58.8 C 73.2 59.4 71.5 58.3 50 92 C 68.4 95.1 78.5 82.7 78.5 82.7 C 78.9 83.7 78.2 81.7 50 92 Z" fill="var(--verde-oscuro)" stroke="var(--tinta)" stroke-width="3"/>
+            </g>
+          </svg>
+        </div>
         <h1 class="home-title">Pit Pong</h1>
         <div class="home-subtitle">Plataforma de Torneos</div>
         <div class="home-stats" id="home-stats"></div>
         <div class="home-campeon oculto" id="home-campeon"></div>
         <div class="home-pausas oculto" id="home-pausas"></div>
         <div class="fila" style="justify-content:center;margin-top:6px;">
-          <button class="btn verde-claro btn-primario-pulso" id="btn-jugar-rapido" style="font-size:1.3rem;padding:18px 28px;white-space:nowrap;">🏓 Jugar partido</button>
+          <button class="btn verde-claro btn-primario-pulso" id="btn-jugar-rapido" style="font-size:1.3rem;padding:18px 28px;white-space:nowrap;">
+            <svg class="icono-pala" viewBox="0 0 100 60" aria-hidden="true" focusable="false">
+              <rect x="4" y="26" width="26" height="10" rx="5" fill="var(--madera)" stroke="var(--tinta)" stroke-width="3"/>
+              <circle cx="46" cy="31" r="24" fill="var(--rojo)" stroke="var(--tinta)" stroke-width="3.5"/>
+              <g transform="translate(46,34) scale(.16) translate(-50,-92)" opacity=".9">
+                <path d="M 50 92 C 37 78.7 21.5 82.7 21.5 82.7 C 21.8 81.7 21.1 83.7 50 92 C 44.9 68.9 27.6 58.8 27.6 58.8 C 28.5 58.3 26.8 59.4 50 92 C 59.4 67.3 50 47 50 47 C 51.2 47 48.9 47 50 92 C 69.5 78.6 72.4 58.8 72.4 58.8 C 73.2 59.4 71.5 58.3 50 92 C 68.4 95.1 78.5 82.7 78.5 82.7 C 78.9 83.7 78.2 81.7 50 92 Z" fill="var(--crema)"/>
+              </g>
+              <circle cx="84" cy="14" r="7" fill="var(--crema)" stroke="var(--tinta)" stroke-width="2.5"/>
+              <path d="M62 34 Q72 24 80 16" fill="none" stroke="var(--dorado)" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+              <path d="M58 40 Q68 32 76 22" fill="none" stroke="var(--dorado)" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+            </svg>
+            Jugar partido
+          </button>
         </div>
         <div class="fila" style="justify-content:center;margin-top:10px;">
           <button class="btn dorado" id="btn-ligas" style="font-size:1rem;padding:12px 24px;">🏅 Ligas</button>
@@ -1436,11 +1567,33 @@
     <div class="sets-info" id="scorer-titulo"></div>
     <div class="scorer-jugadores">
       <div class="score-panel a" id="panel-a">
+        <svg class="impacto-svg" id="impacto-a" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+          <g stroke="var(--dorado)" stroke-linecap="round" fill="none">
+            <path d="M20 80 L45 55" stroke-width="7"/>
+            <path d="M12 58 L42 46" stroke-width="5" opacity=".8"/>
+            <path d="M25 97 L48 65" stroke-width="5" opacity=".8"/>
+            <path d="M80 20 L55 45" stroke-width="7"/>
+            <path d="M88 42 L58 54" stroke-width="5" opacity=".8"/>
+            <path d="M75 3 L52 35" stroke-width="5" opacity=".8"/>
+          </g>
+          <circle cx="50" cy="50" r="9" fill="var(--dorado)" stroke="var(--tinta)" stroke-width="2"/>
+        </svg>
         <div class="nombre" id="nombre-a"></div>
         <div class="puntos" id="puntos-a">0</div>
         <div class="sirve-tag oculto" id="sirve-a">SIRVE</div>
       </div>
       <div class="score-panel b" id="panel-b">
+        <svg class="impacto-svg" id="impacto-b" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+          <g stroke="var(--dorado)" stroke-linecap="round" fill="none">
+            <path d="M20 80 L45 55" stroke-width="7"/>
+            <path d="M12 58 L42 46" stroke-width="5" opacity=".8"/>
+            <path d="M25 97 L48 65" stroke-width="5" opacity=".8"/>
+            <path d="M80 20 L55 45" stroke-width="7"/>
+            <path d="M88 42 L58 54" stroke-width="5" opacity=".8"/>
+            <path d="M75 3 L52 35" stroke-width="5" opacity=".8"/>
+          </g>
+          <circle cx="50" cy="50" r="9" fill="var(--dorado)" stroke="var(--tinta)" stroke-width="2"/>
+        </svg>
         <div class="nombre" id="nombre-b"></div>
         <div class="puntos" id="puntos-b">0</div>
         <div class="sirve-tag oculto" id="sirve-b">SIRVE</div>
@@ -1645,6 +1798,7 @@
   }
 
   let sincronizando = false;
+  let syncInicialHecha = false; // true tras el primer cargarDelServidor(), éxito o fallo
   let guardadoPendiente = false;
 
   function hayBackend(){ return !!PITPONG_API; }
@@ -1859,6 +2013,8 @@
       refrescarVistaActual();
     }catch(err){
       estadoSync("⚠️ Sin conexión — usando los datos de este dispositivo", "error");
+    }finally{
+      syncInicialHecha = true;
     }
   }
 
@@ -4011,8 +4167,21 @@
     guardarProgresoPartido();
   }
 
+  // Efecto visual de "impacto" al marcar un punto: golpe de escala + ráfaga
+  // de líneas de velocidad en el panel que ha anotado. Puramente decorativo,
+  // no toca el marcador ni el flujo del juego.
+  function dispararImpacto(panelId){
+    const panel = document.getElementById(panelId);
+    if(!panel) return;
+    panel.classList.remove("impacto-punto");
+    void panel.offsetWidth;   // fuerza reflow: permite repetirla en puntos seguidos
+    panel.classList.add("impacto-punto");
+    setTimeout(()=>panel.classList.remove("impacto-punto"), 460);
+  }
+
   function marcarPunto(quien){
     if(!scorerState) return;
+    dispararImpacto(quien === ladoIzq() ? "panel-a" : "panel-b");
     scorerState.pointsLog.push(quien);
     const {a,b} = currentGameScore();
     const p = scorerState.pointsPerGame;
@@ -4241,7 +4410,19 @@
     box.classList.remove("oculto");
     const textoBoton = scorerState.tipo==="torneo" ? "✔ Guardar y volver al cuadro" : "✔ Guardar en historial";
     box.innerHTML =
-      '<div class="ganador-box"><h2>🏆 '+escapeHtml(ganadorLado.label)+'</h2>'+
+      '<div class="ganador-box">'+
+      '<svg class="victoria-rayos" viewBox="0 0 100 100" aria-hidden="true" focusable="false">'+
+      '<g fill="var(--verde-oscuro)" opacity=".22">'+
+      '<polygon points="50,50 56,4 44,4" transform="rotate(0 50 50)"/>'+
+      '<polygon points="50,50 56,4 44,4" transform="rotate(45 50 50)"/>'+
+      '<polygon points="50,50 56,4 44,4" transform="rotate(90 50 50)"/>'+
+      '<polygon points="50,50 56,4 44,4" transform="rotate(135 50 50)"/>'+
+      '<polygon points="50,50 56,4 44,4" transform="rotate(180 50 50)"/>'+
+      '<polygon points="50,50 56,4 44,4" transform="rotate(225 50 50)"/>'+
+      '<polygon points="50,50 56,4 44,4" transform="rotate(270 50 50)"/>'+
+      '<polygon points="50,50 56,4 44,4" transform="rotate(315 50 50)"/>'+
+      '</g></svg>'+
+      '<h2>🏆 '+escapeHtml(ganadorLado.label)+'</h2>'+
       '<div>Gana el partido '+scoreLabel+'</div>'+
       '<button class="btn dorado" id="btn-confirmar-resultado" style="margin-top:16px;width:100%;">'+textoBoton+'</button>'+
       '<button class="btn madera" id="btn-revancha-resultado" style="margin-top:8px;width:100%;">🔁 Revancha (mismos jugadores)</button>'+
@@ -4943,7 +5124,19 @@
   }
   function renderProximos(){
     const haySuficientes = players.length >= 2;
-    document.getElementById("proximo-sin-jugadores").classList.toggle("oculto", haySuficientes);
+    // La primerísima carga de una tablet/navegador nuevo tarda unos segundos
+    // en traer los jugadores del servidor (medido: 5-7s). Sin este aviso,
+    // entrar aquí justo en ese hueco mostraba "faltan jugadores" aunque el
+    // club tenga diez — parecía que se había perdido todo sin haberlo hecho.
+    const sincronizandoTodavia = hayBackend() && !syncInicialHecha;
+    const avisoEl = document.getElementById("proximo-sin-jugadores");
+    if(sincronizandoTodavia && !haySuficientes){
+      avisoEl.textContent = "⏳ Cargando jugadores del club…";
+      avisoEl.classList.remove("oculto");
+    } else {
+      avisoEl.textContent = "Hacen falta al menos 2 jugadores registrados — añádelos primero en \"Jugadores y estadísticas\".";
+      avisoEl.classList.toggle("oculto", haySuficientes);
+    }
     document.getElementById("proximo-form").classList.toggle("oculto", !haySuficientes);
     if(haySuficientes) pintarSelectsProximos();
     document.getElementById("proximo-error").classList.add("oculto");

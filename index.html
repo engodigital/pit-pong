@@ -113,9 +113,30 @@
     display:flex;
     flex-direction:column;
     padding-bottom:6px;
+    position:relative;
   }
   #view-home .home-wrap{flex:1 1 auto;min-height:0;}
   #view-home footer.app-footer{flex:0 0 auto;}
+  /* Mesa 3D decorativa (three.js, solo en la portada): una franja abierta
+     detrás del logo/título, no toda la pantalla. Los botones de abajo están
+     siempre centrados igual que la mesa (la pelota viaja por el centro), así
+     que cubrir toda la altura la dejaba tapada casi todo el rato — aquí se
+     ve de verdad. Nunca intercepta toques y se apaga si el navegador
+     prefiere menos movimiento. */
+  #tabla3d-canvas{
+    position:absolute;top:0;left:0;right:0;
+    width:100%;height:min(340px, 34vh);
+    z-index:0;
+    pointer-events:none;
+    opacity:.85;
+  }
+  @media (prefers-reduced-motion: reduce){ #tabla3d-canvas{ display:none; } }
+  #view-home .home-controles,
+  #view-home .home-wrap,
+  #view-home footer.app-footer{
+    position:relative;
+    z-index:1;
+  }
   /* Controles del inicio, arriba a la derecha */
   .home-controles{
     display:flex;justify-content:flex-end;gap:8px;
@@ -1050,6 +1071,7 @@
 <!-- ===================== HOME ===================== -->
 <section id="view-home" class="view">
   <main>
+    <canvas id="tabla3d-canvas" aria-hidden="true"></canvas>
     <div class="home-controles">
       <button class="icon-btn-home btn-reglas" title="Reglas del juego">?</button>
       <button class="icon-btn-home" id="btn-recargar-online" title="Actualizar datos">🔄</button>
@@ -1945,6 +1967,8 @@
     }
     currentView = name;
     window.scrollTo(0,0);
+    // Mesa 3D decorativa: solo viva en la portada, nunca durante un partido.
+    if(name === "home") setTimeout(iniciarTabla3D, 400); else pausarTabla3D();
     if(name === "home") renderHome();
     if(name === "jugadores") renderJugadores();
     if(name === "crear") renderCrear();
@@ -4669,6 +4693,232 @@
     }
     localStorage.setItem(FLAG, "1");
   })();
+
+  /* ===================== MESA 3D DECORATIVA (portada) =====================
+     three.js cargado por CDN, solo bajo demanda (import dinámico) y solo en
+     la portada — nunca en el marcador, para no competir por rendimiento
+     justo cuando se está jugando de verdad. Simula un punto completo: saque
+     (bote en el propio campo, bote en el campo rival), varios intercambios,
+     y una falla aleatoria que decide qué pala "gana" el punto. Puramente
+     decorativo — si el CDN no responde (sin wifi en el club), la app entera
+     sigue funcionando igual, solo que sin la mesa de fondo. */
+  const THREE_CDN = "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js";
+  let tabla3D = null, tabla3DCargando = false, tabla3DAnimando = false, tabla3DFrame = null;
+
+  function construirTabla3D(THREE, canvas){
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+    // Ángulo 3/4 a propósito: si la cámara mira la mesa de frente, la pelota
+    // viaja siempre por el centro de la pantalla — justo donde también está
+    // el logo y los botones (todo centrado). En diagonal, su recorrido cruza
+    // parte de la pantalla lejos del centro y se ve de verdad.
+    camera.position.set(6.5, 7.5, 6.5);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({canvas, alpha:true, antialias:true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.55);
+    dir.position.set(3, 6, 4);
+    scene.add(dir);
+
+    // Colores del cartel oficial de Pit Pong — nada de texturas ni fotos.
+    const VERDE = 0x1D5523, VERDE_OSC = 0x123D1A, MADERA = 0x965828, DORADO = 0xC28C42, ROJO = 0x943026, BLANCO = 0xffffff;
+
+    const LARGO = 8, ANCHO = 4, GROSOR = 0.3;
+    const mesa = new THREE.Mesh(
+      new THREE.BoxGeometry(ANCHO, GROSOR, LARGO),
+      new THREE.MeshStandardMaterial({color:VERDE, flatShading:true})
+    );
+    mesa.position.y = -GROSOR/2;
+    scene.add(mesa);
+
+    function linea(w,d,x,z){
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), new THREE.MeshBasicMaterial({color:BLANCO}));
+      m.position.set(x, 0.011, z);
+      scene.add(m);
+    }
+    linea(ANCHO, 0.06, 0, -LARGO/2+0.03);
+    linea(ANCHO, 0.06, 0, LARGO/2-0.03);
+    linea(0.06, LARGO, -ANCHO/2+0.03, 0);
+    linea(0.06, LARGO, ANCHO/2-0.03, 0);
+    linea(0.05, LARGO, 0, 0);
+
+    const red = new THREE.Mesh(
+      new THREE.BoxGeometry(ANCHO+0.2, 0.5, 0.04),
+      new THREE.MeshStandardMaterial({color:0x1A1108, flatShading:true, transparent:true, opacity:0.85})
+    );
+    red.position.set(0, 0.25, 0);
+    scene.add(red);
+
+    function crearPala(colorMango){
+      const grupo = new THREE.Group();
+      const cara = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.38, 0.38, 0.06, 20),
+        new THREE.MeshStandardMaterial({color:MADERA, flatShading:true})
+      );
+      cara.rotation.x = Math.PI/2;
+      grupo.add(cara);
+      const mango = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.09, 0.11, 0.4, 12),
+        new THREE.MeshStandardMaterial({color:colorMango, flatShading:true})
+      );
+      mango.rotation.x = Math.PI/2;
+      mango.position.z = 0.31;
+      grupo.add(mango);
+      grupo.userData.golpeHasta = 0;
+      return grupo;
+    }
+    const ALTURA_PALA = 0.75, Z_PALA = LARGO/2 + 0.4;
+    const paletA = crearPala(VERDE_OSC);
+    paletA.position.set(0, ALTURA_PALA, -Z_PALA);
+    paletA.rotation.y = Math.PI;
+    paletA.rotation.x = -0.25;
+    const paletB = crearPala(ROJO);
+    paletB.position.set(0, ALTURA_PALA, Z_PALA);
+    paletB.rotation.x = -0.25;
+    scene.add(paletA, paletB);
+
+    const bola = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 12, 10),
+      new THREE.MeshStandardMaterial({color:DORADO, flatShading:true})
+    );
+    bola.name = "bola";
+    scene.add(bola);
+
+    /* ---- Simulación del punto: saque, intercambios, falla aleatoria ---- */
+    function posPala(lado){ return lado==="A" ? paletA.position : paletB.position; }
+    function puntoMesa(lado, t){
+      const z0 = lado==="A" ? -LARGO/2 : LARGO/2;
+      const z1 = lado==="A" ? LARGO/2 : -LARGO/2;
+      return new THREE.Vector3(0, 0.14, z0 + (z1-z0)*t);
+    }
+    function fueraDeMesa(ladoQueFalla){
+      const p = posPala(ladoQueFalla);
+      const dir = ladoQueFalla==="A" ? -1 : 1;
+      return new THREE.Vector3(0, 0.5, p.z + dir*1.6);
+    }
+    function arco(from, to, alturaExtra, duracion, saleDeLado){
+      return {from: from.clone(), to: to.clone(), alturaExtra, duracion, saleDeLado: saleDeLado || null};
+    }
+
+    let servidorActual = Math.random() < 0.5 ? "A" : "B";
+    function generarPunto(){
+      const servidor = servidorActual, receptor = servidor==="A" ? "B" : "A";
+      const segmentos = [
+        arco(posPala(servidor), puntoMesa(servidor,0.32), 0.9, 420, servidor),
+        arco(puntoMesa(servidor,0.32), puntoMesa(servidor,0.82), 1.1, 460),
+        arco(puntoMesa(servidor,0.82), posPala(receptor), 0.85, 380)
+      ];
+      let ultimoGolpe = receptor;
+      const intercambios = 1 + Math.floor(Math.random()*4);
+      for(let i=0;i<intercambios;i++){
+        const golpea = ultimoGolpe, recibe = golpea==="A" ? "B" : "A", esUltimo = i === intercambios-1;
+        const bote = puntoMesa(golpea, 0.48 + Math.random()*0.14);
+        segmentos.push(arco(posPala(golpea), bote, 1.0, 420, golpea));
+        if(esUltimo && Math.random() < 0.5){
+          segmentos.push(arco(bote, fueraDeMesa(recibe), 0.6, 380));
+        } else {
+          segmentos.push(arco(bote, posPala(recibe), 1.0, 420));
+          ultimoGolpe = recibe;
+        }
+      }
+      servidorActual = receptor; // el saque se alterna cada punto
+      return {segmentos, indice:0, transcurrido:0};
+    }
+
+    let reloj = 0, pausaHasta = 0;
+    function golpear(lado){
+      const p = lado==="A" ? paletA : (lado==="B" ? paletB : null);
+      if(p) p.userData.golpeHasta = reloj + 160;
+    }
+    let punto = generarPunto();
+    golpear(punto.segmentos[0].saleDeLado);
+
+    function actualizar(dt){
+      reloj += dt;
+      [paletA, paletB].forEach(p=>{
+        const activo = reloj < p.userData.golpeHasta;
+        const base = -0.25;
+        p.rotation.x += ((activo ? base-0.18 : base) - p.rotation.x) * 0.25;
+      });
+      // Flotación sutil: para que se note que las palas "levitan" solas.
+      const flote = Math.sin(reloj/700)*0.05;
+      paletA.position.y = ALTURA_PALA + flote;
+      paletB.position.y = ALTURA_PALA - flote;
+
+      if(pausaHasta){
+        bola.visible = false;
+        if(reloj < pausaHasta) return;
+        pausaHasta = 0;
+        punto = generarPunto();
+        golpear(punto.segmentos[0].saleDeLado);
+      }
+      bola.visible = true;
+      const seg = punto.segmentos[punto.indice];
+      punto.transcurrido += dt;
+      const t = Math.min(1, punto.transcurrido / seg.duracion);
+      const pos = seg.from.clone().lerp(seg.to, t);
+      pos.y += Math.sin(t*Math.PI) * seg.alturaExtra;
+      bola.position.copy(pos);
+      if(t >= 1){
+        punto.indice++;
+        punto.transcurrido = 0;
+        if(punto.indice >= punto.segmentos.length){
+          pausaHasta = reloj + 900;
+        } else {
+          golpear(punto.segmentos[punto.indice].saleDeLado);
+        }
+      }
+    }
+
+    function ajustarTamano(){
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if(!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w/h;
+      camera.updateProjectionMatrix();
+    }
+
+    return {scene, camera, renderer, actualizar, ajustarTamano};
+  }
+
+  function iniciarTabla3D(){
+    if(tabla3D){ reanudarTabla3D(); return; }
+    if(tabla3DCargando) return;
+    if(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    tabla3DCargando = true;
+    import(/* webpackIgnore: true */ THREE_CDN).then(THREE=>{
+      tabla3D = construirTabla3D(THREE, document.getElementById("tabla3d-canvas"));
+      reanudarTabla3D();
+    }).catch(e=>{
+      console.log("[tabla3d] decorativa, no se pudo cargar (sin red o CDN caído):", e && e.message);
+    }).finally(()=>{ tabla3DCargando = false; });
+  }
+  function reanudarTabla3D(){
+    if(!tabla3D || tabla3DAnimando) return;
+    tabla3DAnimando = true;
+    tabla3D.ajustarTamano();
+    let anterior = performance.now();
+    function loop(t){
+      if(!tabla3DAnimando) return;
+      const dt = Math.min(50, t - anterior); anterior = t;
+      tabla3D.actualizar(dt);
+      tabla3D.renderer.render(tabla3D.scene, tabla3D.camera);
+      tabla3DFrame = requestAnimationFrame(loop);
+    }
+    tabla3DFrame = requestAnimationFrame(loop);
+  }
+  function pausarTabla3D(){
+    tabla3DAnimando = false;
+    if(tabla3DFrame) cancelAnimationFrame(tabla3DFrame);
+  }
+  window.addEventListener("resize", ()=>{ if(tabla3D && currentView==="home") tabla3D.ajustarTamano(); });
+  document.addEventListener("visibilitychange", ()=>{
+    if(document.hidden) pausarTabla3D();
+    else if(currentView==="home") reanudarTabla3D();
+  });
 
   /* ===================== PRÓXIMOS PARTIDOS =====================
      Calendario de partidos 1vs1 programados a futuro entre jugadores ya

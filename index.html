@@ -844,6 +844,23 @@
     padding:4px 10px;border-radius:20px;font-weight:800;font-size:.8rem;margin-top:6px;
   }
 
+  /* Parciales en la pantalla de DETALLE de un resultado: un chip por set,
+     con el marcador de quien gana ese set resaltado en dorado. Distinto de
+     .parciales (texto compacto inline usado en listas). */
+  .sets-detalle{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .sets-chip{
+    background:#fff8ec;border:2px solid var(--madera);border-radius:10px;
+    padding:7px 12px;min-width:78px;text-align:center;box-shadow:var(--shadow);
+  }
+  .sets-chip-num{
+    font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--madera-oscura);opacity:.8;margin-bottom:3px;
+  }
+  .sets-chip-marcador{font-size:1.2rem;font-weight:800;color:var(--tinta);white-space:nowrap;}
+  .sets-chip-guion{margin:0 3px;opacity:.55;}
+  .sets-chip-punto{padding:1px 5px;border-radius:6px;}
+  .sets-chip-punto.gana{background:var(--dorado);color:var(--tinta);}
+
   footer.app-footer{
     text-align:center;padding:10px 20px 16px;color:var(--madera-oscura);font-size:.75rem;opacity:.7;
   }
@@ -2107,6 +2124,29 @@
   // "(11-7, 9-11, 11-6)" — los parciales de cada juego, si el partido los tiene.
   function parcialesLabel(sets){
     return (sets && sets.length) ? sets.map(g=>g.a+"-"+g.b).join(", ") : "";
+  }
+  // Tabla/chips de parciales para la pantalla de DETALLE de un resultado
+  // (no confundir con parcialesLabel, que es el texto compacto "(11-7, 9-11)"
+  // usado en listas — liga, bracket, próximos partidos — que no se toca).
+  // Una fila/chip por set, con el marcador del ganador de ese set resaltado.
+  // Vale para 1, 3 o 5 sets; si no hay sets registrados devuelve "".
+  function setsDetalleHtml(sets){
+    if(!sets || !sets.length) return "";
+    let html = '<div class="sets-detalle">';
+    sets.forEach((g,i)=>{
+      const aGana = g.a > g.b;
+      html +=
+        '<div class="sets-chip">'+
+          '<div class="sets-chip-num">Set '+(i+1)+'</div>'+
+          '<div class="sets-chip-marcador">'+
+            '<span class="sets-chip-punto'+(aGana?' gana':'')+'">'+g.a+'</span>'+
+            '<span class="sets-chip-guion">–</span>'+
+            '<span class="sets-chip-punto'+(!aGana?' gana':'')+'">'+g.b+'</span>'+
+          '</div>'+
+        '</div>';
+    });
+    html += '</div>';
+    return html;
   }
   // Línea de resultado de un partido de torneo para el detalle del historial:
   // "Marco 0 - 2 Ángel (5-11, 8-11) · 05 ago 2026"
@@ -4714,8 +4754,8 @@
         (reciénFinalizado ? '<div class="ganador-box" style="margin-bottom:14px;"><h2>🏆 ¡Partido guardado!</h2><div>Ganador: '+escapeHtml(ganadorLabel)+' — añade aquí abajo alguna foto si quieres.</div></div>' : '')+
         '<h3>'+escapeHtml(nombreA)+' vs '+escapeHtml(nombreB)+'</h3>'+
         '<div class="home-stats">Partida suelta ('+(p.modo||"1vs1")+') · '+formatDate(p.playedAt)+'</div>'+
-        '<div class="campeon-tag">🏆 '+escapeHtml(ganadorLabel)+' — '+escapeHtml(p.scoreLabel)+
-          (parcialesLabel(p.games) ? ' <span class="parciales">('+parcialesLabel(p.games)+')</span>' : '')+'</div>';
+        '<div class="campeon-tag">🏆 '+escapeHtml(ganadorLabel)+' — '+escapeHtml(p.scoreLabel)+'</div>'+
+        setsDetalleHtml(p.games);
     }
     renderGaleria(reg);
   }

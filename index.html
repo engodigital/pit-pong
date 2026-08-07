@@ -508,6 +508,26 @@
     border-radius:999px;padding:1px 7px;margin-left:5px;vertical-align:middle;white-space:nowrap;
   }
 
+  /* Mi perfil: tarjeta hero minimal del jugador con sesión iniciada */
+  .perfil-hero{
+    display:flex;flex-direction:column;align-items:center;text-align:center;
+    padding:34px 16px 26px;
+  }
+  .perfil-hero .avatar{width:96px;height:96px;font-size:2rem;margin-bottom:14px;}
+  .perfil-hero .avatar.con-foto{border:3px solid var(--madera);}
+  .perfil-nombre{
+    display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;
+    margin:0 0 14px;font-size:1.3rem;
+  }
+  .perfil-nombre .pos-atp{font-size:.6em;}
+  .perfil-pitcoin{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--dorado);color:var(--tinta);
+    border-radius:999px;padding:9px 22px;font-weight:800;font-size:1.15rem;
+    margin-bottom:18px;box-shadow:var(--shadow);
+  }
+  .perfil-hero .badges-puntos{justify-content:center;margin-bottom:22px;}
+
   /* Resultados del detalle del historial: legibles desde lejos, sin
      desperdiciar la tarjeta en texto pequeño. */
   .detalle-partidos{
@@ -1730,6 +1750,19 @@
   </main>
 </section>
 
+<!-- ===================== MI PERFIL ===================== -->
+<section id="view-perfil" class="view oculto">
+  <main>
+    <div class="card perfil-hero">
+      <div id="perfil-avatar"></div>
+      <h2 class="perfil-nombre" id="perfil-nombre"></h2>
+      <div class="perfil-pitcoin" id="perfil-pitcoin"></div>
+      <div class="badges-puntos" id="perfil-badges"></div>
+      <button class="btn rojo" id="btn-cerrar-sesion-perfil">🚪 Cerrar sesión</button>
+    </div>
+  </main>
+</section>
+
 <div id="lightbox-container"></div>
 
 <script>
@@ -2110,6 +2143,7 @@
     if(name==="liga"){ const l=getLiga(currentLigaId); return l ? l.name : "Liga"; }
     if(name==="liga-partido") return "Nuevo partido";
     if(name==="proximos") return "Próximos partidos";
+    if(name==="perfil") return "Mi perfil";
     return null;
   }
 
@@ -2170,6 +2204,12 @@
       else { showView("ligas"); return; }
     }
     if(name === "proximos") renderProximos();
+    if(name === "perfil"){
+      // Solo tiene sentido con sesión activa; si no la hay (navegación atrás,
+      // sesión expirada a mitad), redirigimos en vez de romper la pantalla.
+      if(!sesionActual()){ showView("home"); return; }
+      renderPerfil();
+    }
   }
 
   document.getElementById("btn-volver").addEventListener("click", ()=>{
@@ -5318,8 +5358,31 @@
     const btn = document.getElementById("btn-cuenta");
     const s = sesionActual();
     btn.textContent = s ? "👤" : "🔑";
-    btn.title = s ? "Sesión: "+s.nombre+" (toca para cerrar sesión)" : "Iniciar sesión / crear cuenta";
+    btn.title = s ? "Sesión: "+s.nombre+" (toca para ver tu perfil)" : "Iniciar sesión / crear cuenta";
   }
+
+  // Tarjeta hero de "Mi perfil": reutiliza tal cual los mismos datos/badges
+  // que ya se pintan en la ficha de jugador (avatarHtml, nombreConPos,
+  // badgesPuntosHtml) — nada de lógica nueva, solo layout a pantalla completa.
+  function renderPerfil(){
+    const s = sesionActual();
+    if(!s) return; // showView ya redirige a home si no hay sesión
+    const id = s.jugadorId;
+    document.getElementById("perfil-avatar").innerHTML = avatarHtml(id, 96);
+    document.getElementById("perfil-nombre").innerHTML = nombreConPos(id);
+    document.getElementById("perfil-pitcoin").innerHTML = "🪙 "+calcularPitcoin(id)+" PitCoin";
+    const cont = document.getElementById("perfil-badges");
+    cont.innerHTML = badgesPuntosHtml(id);
+    cont.querySelectorAll("[data-detalle-jugador]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        abrirDetallePuntos(btn.getAttribute("data-detalle-jugador"), btn.getAttribute("data-detalle-cat"));
+      });
+    });
+  }
+  document.getElementById("btn-cerrar-sesion-perfil").addEventListener("click", ()=>{
+    cerrarSesion();
+    showView("home");
+  });
 
   let loginJugadorId = null;
   function pasoLogin(paso){
@@ -5330,7 +5393,7 @@
   function abrirLogin(){
     const s = sesionActual();
     if(s){
-      if(confirm("Sesión iniciada como "+s.nombre+". ¿Cerrar sesión?")) cerrarSesion();
+      showView("perfil", {titulo:"Mi perfil"});
       return;
     }
     loginJugadorId = null;
